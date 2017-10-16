@@ -5,7 +5,8 @@ import json
 import sys
 import tempfile
 
-import subprocess
+#import subprocess
+import conda_api
 
 try:
     import requests
@@ -122,36 +123,69 @@ class CondaSearch():
     Tool to search the bioconda channel
     """
 
-    def search(self, search_string):
-        conda_output = subprocess.Popen("conda search %s -c bioconda" % (search_string), shell=True, stdout=subprocess.PIPE)
+    #def __init__(self, search_string):
+    #    self.search_string = search_string
 
-        try:
-            lines = []
-            for line in conda_output.stdout:
-                #sys.stdout.write(line)
-                lst = line.split()
-                del lst[-1]
-                lines.append(lst)
-            del lines[0]
+    def get_json(self, search_string):
+        conda_api.set_root_prefix()
+        self.json_output = conda_api.search(search_string)
 
-            results = 0
-            for line in lines:
-                #package = None
-                try:
-                    int(line[0][0])
-                    line.insert(0, package)
-                except ValueError:
-                    package = line[0]
-                    results += 1
-            col_width = max(len(word) for row in lines for word in row) + 2  # padding
+        return self.json_output
 
-            sys.stdout.write("\nThe query \033[1m %s \033[0m resulted in %s bioconda result(s) with %s available version(s).\n" % (search_string, results, len(lines)))
-
-            for line in lines:
-                sys.stdout.write("".join([line[0].ljust(col_width), (line[1] + "--" + line[2]).ljust(col_width)]) + "conda install -c bioconda %s=%s\n" % (line[0], line[1]))
+    def print_json(self, json_input, search_string):
+        #json_input = json.loads(json_input)
         
-        except ValueError:
-            sys.stdout.write("No conda packages were found matching '%s'.\n" % search_string)
+        results = []
+        no_of_packages = 0
+        no_of_versions = 0
+        for package_name, package_info in json_input.iteritems():
+            no_of_packages += 1
+            for version in package_info:
+                build = version['build']
+                version = version['version']
+                if (package_name, build, version) not in results: # don't duplicate results
+                    results.append((package_name, build, version))
+                    no_of_versions += 1
+
+        col_width = 30
+        col_width = max(len(word) for result in results for word in result) + 2  # padding
+
+        sys.stdout.write("\nThe query \033[1m %s \033[0m resulted in %s bioconda result(s) with %s available version(s).\n" % (search_string, no_of_packages, no_of_versions))
+
+        for result in results:
+            sys.stdout.write("".join([result[0].ljust(col_width), (result[2] + "--" + result[1]).ljust(col_width)]) + "conda install -c bioconda %s=%s\n" % (result[0], result[2]))
+            
+
+    # def search(self, search_string):
+    #     conda_output = subprocess.Popen("conda search %s -c bioconda" % (search_string), shell=True, stdout=subprocess.PIPE)
+        
+    #     try:
+    #         lines = []
+    #         for line in conda_output:
+    #             #sys.stdout.write(line)
+    #             lst = line.split()
+    #             del lst[-1]
+    #             lines.append(lst)
+    #         del lines[0]
+
+        #     results = 0   
+            # for line in lines:
+        #         #package = None
+        #         try:
+        #             int(line[0][0])
+        #             line.insert(0, package)
+        #         except ValueError:
+        #             package = line[0]
+        #             results += 1
+        #     col_width = max(len(word) for row in lines for word in row) + 2  # padding
+
+        #     sys.stdout.write("\nThe query \033[1m %s \033[0m resulted in %s bioconda result(s) with %s available version(s).\n" % (search_string, results, len(lines)))
+
+        #     for line in lines:
+        #         sys.stdout.write("".join([line[0].ljust(col_width), (line[1] + "--" + line[2]).ljust(col_width)]) + "conda install -c bioconda %s=%s\n" % (line[0], line[1]))
+        
+        # except ValueError:
+        #     sys.stdout.write("No conda packages were found matching '%s'.\n" % search_string)
 
 
 def main(argv=None):
@@ -198,13 +232,15 @@ def main(argv=None):
             #quay.conda_search(item)
 
         if len(args.search) > 1:
-            # hash stuff :/
             sys.stdout.write("\nIf you wish to install multiple packages in a single Docker container, rerun the script, including the --multipackage argument, listing all packages (including versions if possible) you want to install.\nExample: python mulled_search.py -s samtools=latest bamtools=2.4.0--3 --multipackage\n")
+    
     if 'conda' in args.search_dest:
         conda = CondaSearch()
 
         for item in args.search:
-            conda.search(item)
+            json = conda.get_json(item)
+            conda.print_json(json, item)
+        
 
     # if 'other' in args.search_dest:
         # implement other options

@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 import tempfile
+import urllib2
 
 #import subprocess
 import conda_api
@@ -128,11 +129,11 @@ class CondaSearch():
 
     def get_json(self, search_string):
         conda_api.set_root_prefix()
-        self.json_output = conda_api.search(search_string)
+        json_output = conda_api.search(search_string)
 
-        return self.json_output
+        return json_output
 
-    def print_json(self, json_input, search_string):
+    def process_json(self, json_input, search_string):
         #json_input = json.loads(json_input)
         
         results = []
@@ -187,6 +188,33 @@ class CondaSearch():
         # except ValueError:
         #     sys.stdout.write("No conda packages were found matching '%s'.\n" % search_string)
 
+class GitHubSearch():
+    def get_json(self, search_string):
+        response = json.loads(urllib2.urlopen("https://api.github.com/search/code?q=%s+in:path+repo:bioconda/bioconda-recipes+path:recipes" % search_string).read())
+        try:
+            json.loads(urllib2.urlopen("https://api.github.com/repos/bioconda/bioconda-recipes/contents/recipes/%s" % search_string).read())
+            recipe_present = True
+        except urllib2.HTTPError:
+            recipe_present = False
+
+        return response, recipe_present
+
+    def process_json(self, json, search_string, recipe_present):
+        if recipe_present:
+            print "A recipe named %s is present in the GitHub repository at the following URL:" % search_string
+            print "https://github.com/bioconda/bioconda-recipes/tree/master/recipes/%s" % search_string
+
+        else:
+            print "No recipe with the name %s could be found." % search_string
+        
+        results = json['items'][0:10] #get top ten results
+        
+        print "Here are the best matches for the query provided."    
+        
+        col_width = max(len(result['name']) for result in results) + 2  # padding
+        for result in results:
+            sys.stdout.write("".join([result['name'].ljust(col_width), "https://github.com/bioconda/bioconda-recipes/tree/master/" + result['path'] + "\n"]))
+            
 
 def main(argv=None):
     if Schema == None:
@@ -203,25 +231,8 @@ def main(argv=None):
                         For too many queries quay.io blocks the request and the results can be incomplete.')
     parser.add_argument('-s', '--search', required=True, nargs='+',
                         help='The name of the tool you want to search for.')
-    parser.add_argument('--multipackage', dest='multipackage', action="store_true")
     
     args = parser.parse_args()
-
-    if args.multipackage:
-        #hash stuff
-        targets = []
-        for p in args.search:
-            try:
-                targets.append(build_target(p.split('=')[0], version=p.split('=')[1]))
-            except IndexError: # if there is no version specified
-                targets.append(build_target(p))
-
-        package_hash = v2_image_name(targets)
-        
-        sys.stdout.write("Install packages %s: docker pull quay.io/biocontainers/%s" % (', '.join(args.search), package_hash))
-
-
-        return
 
     if 'quay' in args.search_dest:
         quay = QuaySearch(args.organization_string)
@@ -230,17 +241,32 @@ def main(argv=None):
         for item in args.search:
             quay.search_repository(item, args.non_strict)
             #quay.conda_search(item)
-
+ 
         if len(args.search) > 1:
-            sys.stdout.write("\nIf you wish to install multiple packages in a single Docker container, rerun the script, including the --multipackage argument, listing all packages (including versions if possible) you want to install.\nExample: python mulled_search.py -s samtools=latest bamtools=2.4.0--3 --multipackage\n")
-    
+            targets = []
+            for p in args.search:
+                try:
+                    targets.append(build_target(p.split('=')[0], version=p.split('=')[1]))
+                except IndexError: # if there is no version specified
+                    targets.append(build_target(p))
+
+            package_hash = v2_image_name(targets)
+            
+            sys.stdout.write("To install packages %s in a single docker container: docker pull quay.io/biocontainers/%s\n" % (', '.join(args.search), package_hash))
+
     if 'conda' in args.search_dest:
         conda = CondaSearch()
 
         for item in args.search:
             json = conda.get_json(item)
-            conda.print_json(json, item)
-        
+            conda.process_json(json, item)
+
+    if 'github' in args.search_dest:
+        github = GitHubSearch()
+
+        for item in args.search:
+            json, recipe_present = github.get_json(item)
+            github.process_json(json, item, recipe_present)
 
     # if 'other' in args.search_dest:
         # implement other options

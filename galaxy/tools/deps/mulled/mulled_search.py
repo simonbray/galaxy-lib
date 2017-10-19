@@ -27,7 +27,6 @@ except ImportError:
 
 QUAY_API_URL = 'https://quay.io/api/v1/repository'
 
-
 class QuaySearch():
     """
     Tool to search within a quay organization for a given software name.
@@ -82,27 +81,29 @@ class QuaySearch():
                     results.extend(results_tmp)
 
             out = list()
+
             for result in results:
                 title = result['title']
                 for version in self.get_additional_repository_information(title):
-                    row = [title]
-                    row.append(version)
-                    out.append(row)
+                    out.append({'package': title, 'version': version})
 
-            sys.stdout.write("The query \033[1m %s \033[0m resulted in %s Docker result(s) with %s available version(s).\n" % (search_string, len(results), len(out)))
+            return out
 
-            if non_strict:
-                sys.stdout.write('The search was relaxed and the following search terms were searched: ')
-                sys.stdout.write('\033[1m %s \033[0m\n' % ', '.join(suggestions))
 
-            if out:
-                col_width = max(len(word) for row in out for word in row) + 2  # padding
-                for row in out:
-                    name = row[0]
-                    version = row[1]
-                    sys.stdout.write("".join(word.ljust(col_width) for word in row) + "docker pull quay.io/%s/%s:%s\n" % (self.organization, name, version))
-            else:
-                sys.stdout.write("No results found for %s in quay.io/%s.\n" % (search_string, self.organization))
+            # sys.stdout.write("The query \033[1m %s \033[0m resulted in %s Docker result(s) with %s available version(s).\n" % (search_string, len(results), len(out)))
+
+            # if non_strict:
+            #     sys.stdout.write('The search was relaxed and the following search terms were searched: ')
+            #     sys.stdout.write('\033[1m %s \033[0m\n' % ', '.join(suggestions))
+
+            # if out:
+            #     col_width = max(len(word) for row in out for word in row) + 2  # padding
+            #     for row in out:
+            #         name = row[0]
+            #         version = row[1]
+            #         sys.stdout.write("".join(word.ljust(col_width) for word in row) + "docker pull quay.io/%s/%s:%s\n" % (self.organization, name, version))
+            # else:
+            #     sys.stdout.write("No results found for %s in quay.io/%s.\n" % (search_string, self.organization))
 
             
 
@@ -124,37 +125,42 @@ class CondaSearch():
     Tool to search the bioconda channel
     """
 
-    #def __init__(self, search_string):
-    #    self.search_string = search_string
-
     def get_json(self, search_string):
+        """
+        Function takes search_string variable and returns results from the bioconda channel in JSON format 
+        """
         conda_api.set_root_prefix()
         json_output = conda_api.search(search_string)
 
         return json_output
 
     def process_json(self, json_input, search_string):
-        #json_input = json.loads(json_input)
-        
+        """
+        Function takes JSON input and processes it, returning the required data
+        """
         results = []
         no_of_packages = 0
         no_of_versions = 0
         for package_name, package_info in json_input.iteritems():
             no_of_packages += 1
-            for version in package_info:
-                build = version['build']
-                version = version['version']
+            for item in package_info:
+                build = item['build']
+                version = item['version']
                 if (package_name, build, version) not in results: # don't duplicate results
-                    results.append((package_name, build, version))
+                    results.append({'package': package_name, 'build': build, 'version': version})
                     no_of_versions += 1
+        print results
+        return results
 
-        col_width = 30
-        col_width = max(len(word) for result in results for word in result) + 2  # padding
+    # def print_output(json_input):
 
-        sys.stdout.write("\nThe query \033[1m %s \033[0m resulted in %s bioconda result(s) with %s available version(s).\n" % (search_string, no_of_packages, no_of_versions))
+    #     col_width = 30
+    #     col_width = max(len(word) for result in results for word in result) + 2  # padding
 
-        for result in results:
-            sys.stdout.write("".join([result[0].ljust(col_width), (result[2] + "--" + result[1]).ljust(col_width)]) + "conda install -c bioconda %s=%s\n" % (result[0], result[2]))
+    #     sys.stdout.write("\nThe query \033[1m %s \033[0m resulted in %s bioconda result(s) with %s available version(s).\n" % (search_string, no_of_packages, no_of_versions))
+
+    #     for result in results:
+    #         sys.stdout.write("".join([result[0].ljust(col_width), (result[2] + "--" + result[1]).ljust(col_width)]) + "conda install -c bioconda %s=%s\n" % (result[0], result[2]))
             
 
     # def search(self, search_string):
@@ -190,31 +196,47 @@ class CondaSearch():
 
 class GitHubSearch():
     def get_json(self, search_string):
+        """
+        Function takes search_string variable and returns results from the bioconda-recipes github repository in JSON format 
+        """
         response = json.loads(urllib2.urlopen("https://api.github.com/search/code?q=%s+in:path+repo:bioconda/bioconda-recipes+path:recipes" % search_string).read())
+        return response
+
+    def process_json(self, json, search_string):
+        """
+        Function takes JSON input and processes it, returning the required data
+        """
+        json = json['items'][0:10] #get top ten results
+        
+        results = []
+        for result in json:
+            results.append({'name': result['name'], 'path': result['path']})
+        return results
+
+        # print "Here are the best matches for the query provided."    
+        
+        # col_width = max(len(result['name']) for result in json) + 2  # padding
+        # for result in json:
+        #     sys.stdout.write("".join([result['name'].ljust(col_width), "https://github.com/bioconda/bioconda-recipes/tree/master/" + result['path'] + "\n"]))
+    
+    def recipe_present(self, search_string):
+        """
+        Checks if a recipe exists in bioconda-recipes which matches search_string exactly
+        """
         try:
             json.loads(urllib2.urlopen("https://api.github.com/repos/bioconda/bioconda-recipes/contents/recipes/%s" % search_string).read())
             recipe_present = True
         except urllib2.HTTPError:
             recipe_present = False
 
-        return response, recipe_present
-
-    def process_json(self, json, search_string, recipe_present):
         if recipe_present:
             print "A recipe named %s is present in the GitHub repository at the following URL:" % search_string
             print "https://github.com/bioconda/bioconda-recipes/tree/master/recipes/%s" % search_string
 
         else:
             print "No recipe with the name %s could be found." % search_string
-        
-        results = json['items'][0:10] #get top ten results
-        
-        print "Here are the best matches for the query provided."    
-        
-        col_width = max(len(result['name']) for result in results) + 2  # padding
-        for result in results:
-            sys.stdout.write("".join([result['name'].ljust(col_width), "https://github.com/bioconda/bioconda-recipes/tree/master/" + result['path'] + "\n"]))
-            
+
+        return recipe_present
 
 def main(argv=None):
     if Schema == None:
@@ -239,7 +261,7 @@ def main(argv=None):
         quay.build_index()
 
         for item in args.search:
-            quay.search_repository(item, args.non_strict)
+            print quay.search_repository(item, args.non_strict)
             #quay.conda_search(item)
  
         if len(args.search) > 1:
@@ -259,14 +281,14 @@ def main(argv=None):
 
         for item in args.search:
             json = conda.get_json(item)
-            conda.process_json(json, item)
+            print conda.process_json(json, item)
 
     if 'github' in args.search_dest:
         github = GitHubSearch()
 
         for item in args.search:
-            json, recipe_present = github.get_json(item)
-            github.process_json(json, item, recipe_present)
+            json = github.get_json(item)
+            print github.process_json(json, item)
 
     # if 'other' in args.search_dest:
         # implement other options

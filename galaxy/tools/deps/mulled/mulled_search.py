@@ -30,6 +30,17 @@ QUAY_API_URL = 'https://quay.io/api/v1/repository'
 class QuaySearch():
     """
     Tool to search within a quay organization for a given software name.
+
+    >>> t = QuaySearch("biocontainers")
+    >>> t.build_index()
+    >>> t.search_repository("adsfasdf", True)
+    []
+    >>> t.search_repository("adsfasdf", False)
+    []
+    >>> t.search_repository("bamtool", True)
+    []
+    >>> {'version': u'2.2.0--0', 'package': u'bioconductor-gosemsim'} in t.search_repository("bioconductor-gosemsim", True) 
+    True
     """
 
     def __init__(self, organization):
@@ -62,10 +73,11 @@ class QuaySearch():
         Search Docker containers on quay.io.
         Results are displayed with all available versions,
         including the complete image name.
+        
         """
         # with statement closes searcher after usage.
         with self.index.searcher() as searcher:
-            search_string = "*%s*" % search_string
+            #search_string = "*%s*" % search_string
             query = QueryParser("title", self.index.schema).parse(search_string)
             results = searcher.search(query)
             if non_strict:
@@ -111,6 +123,9 @@ class QuaySearch():
         """
         Function downloads additional information from quay.io to
         get the tag-field which includes the version number.
+
+        
+
         """
         url = "%s/%s/%s" % (QUAY_API_URL, self.organization, repository_string)
         r = requests.get(url, headers={'Accept-encoding': 'gzip'})
@@ -123,11 +138,24 @@ class QuaySearch():
 class CondaSearch():
     """
     Tool to search the bioconda channel
+
+
+    >>> t = CondaSearch()
+    
+    >>> t.process_json(t.get_json("adsfasdf"), "adsfasdf")
+    []
+    >>> t.process_json(t.get_json("bamtool"), "bamtool")
+    []
+    >>> {'version': u'2.2.0', 'build': u'0', 'package': u'bioconductor-gosemsim'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
+    True
+
+
     """
 
     def get_json(self, search_string):
         """
         Function takes search_string variable and returns results from the bioconda channel in JSON format 
+
         """
         conda_api.set_root_prefix()
         json_output = conda_api.search(search_string)
@@ -141,6 +169,13 @@ class CondaSearch():
         results = []
         no_of_packages = 0
         no_of_versions = 0
+
+        try:
+            json_input['exception_name'] # if the search fails, probably because there are no results
+            return results
+        except KeyError:
+            pass
+
         for package_name, package_info in json_input.iteritems():
             no_of_packages += 1
             for item in package_info:
@@ -149,7 +184,6 @@ class CondaSearch():
                 if (package_name, build, version) not in results: # don't duplicate results
                     results.append({'package': package_name, 'build': build, 'version': version})
                     no_of_versions += 1
-        print results
         return results
 
     # def print_output(json_input):
@@ -195,6 +229,21 @@ class CondaSearch():
         #     sys.stdout.write("No conda packages were found matching '%s'.\n" % search_string)
 
 class GitHubSearch():
+    """
+    Tool to search the GitHub bioconda-recipes repo
+
+
+    >>> t = GitHubSearch()
+    >>> t.process_json(t.get_json("adsfasdf"), "adsfasdf")
+    []
+    >>> t.process_json(t.get_json("bamtool"), "bamtool")
+    []
+    >>> {'path': u'recipes/bioconductor-gosemsim/build.sh', 'name': u'build.sh'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
+    True
+
+        
+    """
+
     def get_json(self, search_string):
         """
         Function takes search_string variable and returns results from the bioconda-recipes github repository in JSON format 
@@ -206,6 +255,7 @@ class GitHubSearch():
         """
         Function takes JSON input and processes it, returning the required data
         """
+
         json = json['items'][0:10] #get top ten results
         
         results = []
@@ -222,6 +272,17 @@ class GitHubSearch():
     def recipe_present(self, search_string):
         """
         Checks if a recipe exists in bioconda-recipes which matches search_string exactly
+        
+        >>> t = GitHubSearch()
+        >>> t.recipe_present("bioconductor-gosemsim")
+        True
+
+        >>> t.recipe_present("bioconductor-gosemsi")
+        False
+
+        >>> t.recipe_present("bioconductor_gosemsim")
+        False
+
         """
         try:
             json.loads(urllib2.urlopen("https://api.github.com/repos/bioconda/bioconda-recipes/contents/recipes/%s" % search_string).read())
@@ -229,12 +290,12 @@ class GitHubSearch():
         except urllib2.HTTPError:
             recipe_present = False
 
-        if recipe_present:
-            print "A recipe named %s is present in the GitHub repository at the following URL:" % search_string
-            print "https://github.com/bioconda/bioconda-recipes/tree/master/recipes/%s" % search_string
+        #if recipe_present:
+        #    print "A recipe named %s is present in the GitHub repository at the following URL:" % search_string
+        #    print "https://github.com/bioconda/bioconda-recipes/tree/master/recipes/%s" % search_string
 
-        else:
-            print "No recipe with the name %s could be found." % search_string
+        #else:
+        #    print "No recipe with the name %s could be found." % search_string
 
         return recipe_present
 
@@ -295,3 +356,6 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+
+    #import doctest
+    #doctest.testmod()

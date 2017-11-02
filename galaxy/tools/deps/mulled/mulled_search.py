@@ -97,7 +97,11 @@ class QuaySearch():
             for result in results:
                 title = result['title']
                 for version in self.get_additional_repository_information(title):
-                    out.append({'package': title, 'version': version})
+                    try:
+                        version, build = version.split('--')
+                    except ValueError:
+                        version, build = version, None
+                    out.append({'package': title, 'version': version, 'build': build})
 
             return out
 
@@ -244,6 +248,9 @@ class GitHubSearch():
         
     """
 
+    #def __init__(self, organization):
+    #    self.organization = organization
+
     def get_json(self, search_string):
         """
         Function takes search_string variable and returns results from the bioconda-recipes github repository in JSON format 
@@ -299,6 +306,32 @@ class GitHubSearch():
 
         return recipe_present
 
+def get_package_hash(packages, versions):
+    """
+    Takes packages and versions (if the latter are given) and returns a hash for each. Also checks github to see if the container is already present.
+    """
+
+    hash_results = {}
+    targets = []
+    if versions:
+        for p in packages:
+            targets.append(build_target(p, version=versions[p]))
+    else:
+        for p in packages:
+            targets.append(build_target(p))
+    package_hash = v2_image_name(targets)
+    hash_results['package_hash'] = package_hash.split(':')[0]
+    if versions:
+        hash_results['version_hash'] = package_hash.split(':')[1]
+        container_present = False
+        multicontainers = json.loads(urllib2.urlopen("https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations").read())
+        for n in multicontainers:
+            if n['name'] == '%s-0.tsv' % package_hash:
+                container_present = True
+                break
+        hash_results['container_present'] = container_present
+    return hash_results
+
 def main(argv=None):
     if Schema == None:
         sys.stdout.write("Required dependencies are not installed. Run 'pip install Whoosh'.\n")
@@ -312,47 +345,67 @@ def main(argv=None):
     parser.add_argument('--non-strict', dest='non_strict', action="store_true",
                         help='Autocorrection of typos activated. Lists more results but can be confusing.\
                         For too many queries quay.io blocks the request and the results can be incomplete.')
+    parser.add_argument('--json', dest='json', action="store_true", help='Returns results as JSON.')
     parser.add_argument('-s', '--search', required=True, nargs='+',
                         help='The name of the tool you want to search for.')
-    
+    parser.add_argument('-v', '--version', dest='version', action="store_true", help="Filter results by version numbers, which must be given with the package names.")
+
     args = parser.parse_args()
 
+    json_results = {dest: None for dest in args.search_dest}
+
+    versions = {}
+    if args.version: # extract the version numbers from args.search_dest
+        try:
+            versions = {n.split('=')[0]: n.split('=')[1] for n in args.search}
+            args.search = [n.split('=')[0] for n in args.search]
+        except IndexError:
+            print "Please include a version number for every package you wish to search. Alternatively, remove the --version tag."
+            return
+
     if 'quay' in args.search_dest:
+        quay_results = {}
         quay = QuaySearch(args.organization_string)
         quay.build_index()
 
         for item in args.search:
-            print quay.search_repository(item, args.non_strict)
-            #quay.conda_search(item)
- 
-        if len(args.search) > 1:
-            targets = []
-            for p in args.search:
-                try:
-                    targets.append(build_target(p.split('=')[0], version=p.split('=')[1]))
-                except IndexError: # if there is no version specified
-                    targets.append(build_target(p))
-
-            package_hash = v2_image_name(targets)
+            quay_results[item] = quay.search_repository(item, args.non_strict)
             
-            sys.stdout.write("To install packages %s in a single docker container: docker pull quay.io/biocontainers/%s\n" % (', '.join(args.search), package_hash))
+        if args.version: # if the version tag is on, filter by version
+            for p in args.search:
+                quay_results[p] = [q for q in quay_results[p] if q['version'] == versions[p]]
+
+        json_results['quay'] = quay_results
 
     if 'conda' in args.search_dest:
+        conda_results = {}
         conda = CondaSearch()
 
         for item in args.search:
-            json = conda.get_json(item)
-            print conda.process_json(json, item)
+            conda_json = conda.get_json(item)
+            conda_results[item] = conda.process_json(conda_json, item)
+        json_results['conda'] = conda_results
 
     if 'github' in args.search_dest:
+        github_results = {}
         github = GitHubSearch()
 
         for item in args.search:
-            json = github.get_json(item)
-            print github.process_json(json, item)
+            github_json = github.get_json(item)
+            json_results['github'] = github.process_json(github_json, item)
 
     # if 'other' in args.search_dest:
         # implement other options
+
+    if len(args.search) > 1: # get hash if multiple packages are searched
+        json_results['hash'] = get_package_hash(args.search, versions)
+
+    if args.json:
+        # return format as json.
+        print json_results
+    else:
+        # pretty formatting stuff here
+        print "Not yet implemented."
 
 if __name__ == "__main__":
     main()

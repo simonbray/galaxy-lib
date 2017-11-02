@@ -332,6 +332,14 @@ def get_package_hash(packages, versions):
         hash_results['container_present'] = container_present
     return hash_results
 
+def singularity_search(hash_dict):
+    full_hash = "%3A".join([hash_dict['package_hash'], hash_dict['version_hash']])
+    hashlist = [n[9:-100] for n in urllib2.urlopen("https://depot.galaxyproject.org/singularity/").read().split("\n")[4:-3]]
+    if full_hash in hashlist:
+        return "https://depot.galaxyproject.org/singularity/%s-0" % full_hash
+    else:
+        return None
+
 def main(argv=None):
     if Schema == None:
         sys.stdout.write("Required dependencies are not installed. Run 'pip install Whoosh'.\n")
@@ -400,6 +408,12 @@ def main(argv=None):
     if len(args.search) > 1: # get hash if multiple packages are searched
         json_results['hash'] = get_package_hash(args.search, versions)
 
+    if 'singularity' in args.search_dest:
+        if 'hash' in json_results:
+            json_results['singularity'] = singularity_search(json_results['hash'])
+        else:
+            print "No hash available, probably because only one package was searched."
+
     if args.json:
         # return format as json.
         print json_results
@@ -408,7 +422,7 @@ def main(argv=None):
         print "Not yet implemented."
 
 if __name__ == "__main__":
-    main()
+    #main()
 
-    #import doctest
-    #doctest.testmod()
+    import doctest
+    doctest.testmod()

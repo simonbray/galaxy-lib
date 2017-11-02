@@ -37,8 +37,6 @@ class QuaySearch():
     []
     >>> t.search_repository("adsfasdf", False)
     []
-    >>> t.search_repository("bamtool", True)
-    []
     >>> {'version': u'2.2.0--0', 'package': u'bioconductor-gosemsim'} in t.search_repository("bioconductor-gosemsim", True) 
     True
     """
@@ -147,8 +145,6 @@ class CondaSearch():
     >>> t = CondaSearch()
     
     >>> t.process_json(t.get_json("adsfasdf"), "adsfasdf")
-    []
-    >>> t.process_json(t.get_json("bamtool"), "bamtool")
     []
     >>> {'version': u'2.2.0', 'build': u'0', 'package': u'bioconductor-gosemsim'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
     True
@@ -309,6 +305,14 @@ class GitHubSearch():
 def get_package_hash(packages, versions):
     """
     Takes packages and versions (if the latter are given) and returns a hash for each. Also checks github to see if the container is already present.
+    
+    >>> get_package_hash(['bamtools', 'samtools'], {})
+    {'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
+    >>> get_package_hash(['bamtools', 'samtools'], {'bamtools':'2.4.0', 'samtools':'1.3.1'})
+    {'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
+    >>> get_package_hash(['abricate', 'abyss'], {'abricate': '0.4', 'abyss': '2.0.1'})
+    {'container_present': False, 'version_hash': 'e21d1262f064e1e01b6b9fad5bea117928f31b38', package_hash': 'mulled-v2-cde36934a4704f448af44bf01deeae8d2832ca2e'}
+    
     """
 
     hash_results = {}
@@ -333,6 +337,14 @@ def get_package_hash(packages, versions):
     return hash_results
 
 def singularity_search(hash_dict):
+    """
+    Checks if a singularity package is present at the galaxy website and returns the link.
+    >>> singularity_search({'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'})
+    'https://depot.galaxyproject.org/singularity/mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa%3Ac17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'
+    >>> singularity_search({'container_present': False, 'version_hash': 'cb5455068b161c76257d2e2bcffa58f54f920291', 'package_hash': 'mulled-v2-19fa9431f5863b2be81ff13791f1b00160ed0852'}) is None
+    True
+    """
+
     full_hash = "%3A".join([hash_dict['package_hash'], hash_dict['version_hash']])
     hashlist = [n[9:-100] for n in urllib2.urlopen("https://depot.galaxyproject.org/singularity/").read().split("\n")[4:-3]]
     if full_hash in hashlist:

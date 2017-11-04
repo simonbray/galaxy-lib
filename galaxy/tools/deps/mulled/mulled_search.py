@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 import urllib2
+import logging
 
 #import subprocess
 import conda_api
@@ -54,7 +55,6 @@ class QuaySearch():
 
         parameters = {'public': 'true', 'namespace': self.organization}
         r = requests.get(QUAY_API_URL, headers={'Accept-encoding': 'gzip'}, params=parameters, timeout=12)
-
         tmp_dir = tempfile.mkdtemp()
         schema = Schema(title=TEXT(stored=True), content=STORED)
         self.index = create_in(tmp_dir, schema)
@@ -167,8 +167,8 @@ class CondaSearch():
         Function takes JSON input and processes it, returning the required data
         """
         results = []
-        no_of_packages = 0
-        no_of_versions = 0
+        #no_of_packages = 0
+        #no_of_versions = 0
 
         try:
             json_input['exception_name'] # if the search fails, probably because there are no results
@@ -177,13 +177,13 @@ class CondaSearch():
             pass
 
         for package_name, package_info in json_input.iteritems():
-            no_of_packages += 1
+            #no_of_packages += 1
             for item in package_info:
                 build = item['build']
                 version = item['version']
                 if (package_name, build, version) not in results: # don't duplicate results
                     results.append({'package': package_name, 'build': build, 'version': version})
-                    no_of_versions += 1
+                    #no_of_versions += 1
         return results
 
     # def print_output(json_input):
@@ -307,50 +307,54 @@ def get_package_hash(packages, versions):
     Takes packages and versions (if the latter are given) and returns a hash for each. Also checks github to see if the container is already present.
     
     >>> get_package_hash(['bamtools', 'samtools'], {})
-    {'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
+    {'container_present': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
     >>> get_package_hash(['bamtools', 'samtools'], {'bamtools':'2.4.0', 'samtools':'1.3.1'})
-    {'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
+    {'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'container_present_with_version': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
     >>> get_package_hash(['abricate', 'abyss'], {'abricate': '0.4', 'abyss': '2.0.1'})
-    {'container_present': False, 'version_hash': 'e21d1262f064e1e01b6b9fad5bea117928f31b38', package_hash': 'mulled-v2-cde36934a4704f448af44bf01deeae8d2832ca2e'}
+    {'container_present': False, 'version_hash': 'e21d1262f064e1e01b6b9fad5bea117928f31b38', 'package_hash': 'mulled-v2-cde36934a4704f448af44bf01deeae8d2832ca2e'}
     
     """
 
     hash_results = {}
     targets = []
-    if versions:
+    if versions: 
         for p in packages:
             targets.append(build_target(p, version=versions[p]))
-    else:
+    else: #if versions are not given only calculate the package hash
         for p in packages:
             targets.append(build_target(p))
-    package_hash = v2_image_name(targets)
+    package_hash = v2_image_name(targets) #make the hash from the processed targets
     hash_results['package_hash'] = package_hash.split(':')[0]
     if versions:
         hash_results['version_hash'] = package_hash.split(':')[1]
-        container_present = False
-        multicontainers = json.loads(urllib2.urlopen("https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations").read())
-        for n in multicontainers:
-            if n['name'] == '%s-0.tsv' % package_hash:
-                container_present = True
-                break
-        hash_results['container_present'] = container_present
+    try:
+        r = json.loads(urllib2.urlopen("https://quay.io/api/v1/repository/biocontainers/%s" % hash_results['package_hash']).read())
+    except urllib2.HTTPError:
+        hash_results['container_present'] = False # page could not be retrieved so container not present
+    else:
+        hash_results['container_present'] = True
+        if versions: # now test if the version hash is listed in the repository tags
+            tags = [n[:-2] for n in r['tags']] #remove -0, -1, etc from end of the tag
+            if hash_results['version_hash'] in tags:
+                hash_results['container_present_with_version'] = True
+            else:
+                hash_results['container_present_with_version'] = False
+
     return hash_results
 
 def singularity_search(hash_dict):
     """
     Checks if a singularity package is present at the galaxy website and returns the link.
     >>> singularity_search({'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'})
-    'https://depot.galaxyproject.org/singularity/mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa%3Ac17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'
+    'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa%3Ac17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'
     >>> singularity_search({'container_present': False, 'version_hash': 'cb5455068b161c76257d2e2bcffa58f54f920291', 'package_hash': 'mulled-v2-19fa9431f5863b2be81ff13791f1b00160ed0852'}) is None
     True
     """
 
     full_hash = "%3A".join([hash_dict['package_hash'], hash_dict['version_hash']])
-    hashlist = [n[9:-100] for n in urllib2.urlopen("https://depot.galaxyproject.org/singularity/").read().split("\n")[4:-3]]
-    if full_hash in hashlist:
-        return "https://depot.galaxyproject.org/singularity/%s-0" % full_hash
-    else:
-        return None
+    #remove initial and final lines from html with [4:-3] slice then extract hash with split('"'). Dictionary consists of {hash: url}.
+    urls = {n.split('"')[1][:-2]: n.split('"')[1] for n in urllib2.urlopen("https://depot.galaxyproject.org/singularity/").read().split("\n")[4:-3]}
+    return urls.get(full_hash) # returns the url if present, otherwise None
 
 def main(argv=None):
     if Schema == None:
@@ -380,22 +384,8 @@ def main(argv=None):
             versions = {n.split('=')[0]: n.split('=')[1] for n in args.search}
             args.search = [n.split('=')[0] for n in args.search]
         except IndexError:
-            print "Please include a version number for every package you wish to search. Alternatively, remove the --version tag."
+            logging.error("Please include a version number for every package you wish to search. Alternatively, remove the --version tag.")
             return
-
-    if 'quay' in args.search_dest:
-        quay_results = {}
-        quay = QuaySearch(args.organization_string)
-        quay.build_index()
-
-        for item in args.search:
-            quay_results[item] = quay.search_repository(item, args.non_strict)
-            
-        if args.version: # if the version tag is on, filter by version
-            for p in args.search:
-                quay_results[p] = [q for q in quay_results[p] if q['version'] == versions[p]]
-
-        json_results['quay'] = quay_results
 
     if 'conda' in args.search_dest:
         conda_results = {}
@@ -420,21 +410,35 @@ def main(argv=None):
     if len(args.search) > 1: # get hash if multiple packages are searched
         json_results['hash'] = get_package_hash(args.search, versions)
 
+    if 'quay' in args.search_dest:
+        quay_results = {}
+        quay = QuaySearch(args.organization_string)
+        quay.build_index()
+
+        for item in args.search:
+            quay_results[item] = quay.search_repository(item, args.non_strict)
+            
+        if args.version: # if the version tag is on, filter by version
+            for p in args.search:
+                quay_results[p] = [q for q in quay_results[p] if q['version'] == versions[p]]
+
+        json_results['quay'] = quay_results
+
     if 'singularity' in args.search_dest:
         if 'hash' in json_results:
             json_results['singularity'] = singularity_search(json_results['hash'])
         else:
-            print "No hash available, probably because only one package was searched."
+            print("No hash available, probably because only one package was searched.")
 
     if args.json:
         # return format as json.
-        print json_results
+        print(json_results)
     else:
         # pretty formatting stuff here
-        print "Not yet implemented."
+        print("Not yet implemented.")
 
 if __name__ == "__main__":
-    #main()
+    main()
 
-    import doctest
-    doctest.testmod()
+    #import doctest
+    #doctest.testmod()

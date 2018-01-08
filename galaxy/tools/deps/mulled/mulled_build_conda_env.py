@@ -6,6 +6,10 @@ import logging
 from galaxy.tools.deps.conda_util import install_conda_targets, CondaContext, CondaTarget
 
 class EnvRequest():
+    """
+    Takes the name of a docker container and returns a conda environment.
+    """
+    
     def __init__(self, container_name):
         self.container = container_name
         self.conda_context = CondaContext(ensure_channels='bioconda')
@@ -16,6 +20,9 @@ class EnvRequest():
             self.packages = self.get_packages_from_hash()
 
     def get_packages_from_hash(self):
+        """
+        If self.container is a hash, check what packages it refers to using GitHub.
+        """
         github_hashes = json.loads(urllib2.urlopen('https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations/').read())
         for item in github_hashes: # check if the container name is in the github repo
             if item['name'][0:50] == self.container:
@@ -25,6 +32,9 @@ class EnvRequest():
         logging.error("Container name not recognized.")
 
     def install_env(self):
+        """
+        Install a conda environment with the requested package(s).
+        """
         if self.packages == None: # if the container was not available
             return None
         targets = [CondaTarget(package) for package in self.packages] # create a target object for each package

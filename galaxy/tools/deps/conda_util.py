@@ -56,7 +56,7 @@ def find_conda_prefix(conda_prefix=None):
             return miniconda_3_dest
         elif os.path.exists(miniconda_2_dest):
             return miniconda_2_dest
-        if os.path.exists(anaconda_3_dest):
+        elif os.path.exists(anaconda_3_dest):
             return anaconda_3_dest
         elif os.path.exists(anaconda_2_dest):
             return anaconda_2_dest

@@ -6,6 +6,8 @@ import sys
 import tempfile
 import urllib2
 import logging
+from lxml import html
+from mulled_update_singularity_containers import get_singularity_containers
 
 #import subprocess
 import conda_api
@@ -95,11 +97,11 @@ class QuaySearch():
             for result in results:
                 title = result['title']
                 for version in self.get_additional_repository_information(title):
-                    try:
-                        version, build = version.split('--')
-                    except ValueError:
-                        version, build = version, None
-                    out.append({'package': title, 'version': version, 'build': build})
+                    # try:
+                    #     version, build = version.split('--')
+                    # except ValueError:
+                    #     version, build = version, None
+                    out.append({'package': title, 'version': version,}) # 'build': build})
 
             return out
 
@@ -125,9 +127,6 @@ class QuaySearch():
         """
         Function downloads additional information from quay.io to
         get the tag-field which includes the version number.
-
-        
-
         """
         url = "%s/%s/%s" % (QUAY_API_URL, self.organization, repository_string)
         r = requests.get(url, headers={'Accept-encoding': 'gzip'})
@@ -135,7 +134,6 @@ class QuaySearch():
         json_decoder = json.JSONDecoder()
         decoded_request = json_decoder.decode(r.text)
         return decoded_request['tags']
-
 
 class CondaSearch():
     """
@@ -158,7 +156,7 @@ class CondaSearch():
 
         """
         conda_api.set_root_prefix()
-        json_output = conda_api.search(search_string)
+        json_output = conda_api.search(search_string, channel='bioconda')
 
         return json_output
 
@@ -170,19 +168,16 @@ class CondaSearch():
         #no_of_packages = 0
         #no_of_versions = 0
 
-        try:
-            json_input['exception_name'] # if the search fails, probably because there are no results
-            return results
-        except KeyError:
-            pass
+        if json_input.get('exception_name', False):
+            return results # if the search fails, probably because there are no results
 
         for package_name, package_info in json_input.iteritems():
             #no_of_packages += 1
             for item in package_info:
-                build = item['build']
+                #build = item['build']
                 version = item['version']
-                if (package_name, build, version) not in results: # don't duplicate results
-                    results.append({'package': package_name, 'build': build, 'version': version})
+                if {'package': package_name, 'version': version} not in results: # don't duplicate results
+                    results.append({'package': package_name, 'version': version})
                     #no_of_versions += 1
         return results
 
@@ -228,6 +223,8 @@ class CondaSearch():
         # except ValueError:
         #     sys.stdout.write("No conda packages were found matching '%s'.\n" % search_string)
 
+
+
 class GitHubSearch():
     """
     Tool to search the GitHub bioconda-recipes repo
@@ -262,6 +259,7 @@ class GitHubSearch():
         json = json['items'][0:10] #get top ten results
         
         results = []
+
         for result in json:
             results.append({'name': result['name'], 'path': result['path']})
         return results
@@ -342,7 +340,7 @@ def get_package_hash(packages, versions):
 
     return hash_results
 
-def singularity_search(hash_dict):
+def singularity_search(search_string):
     """
     Checks if a singularity package is present and returns the link.
     >>> singularity_search({'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'})
@@ -350,11 +348,68 @@ def singularity_search(hash_dict):
     >>> singularity_search({'container_present': False, 'version_hash': 'cb5455068b161c76257d2e2bcffa58f54f920291', 'package_hash': 'mulled-v2-19fa9431f5863b2be81ff13791f1b00160ed0852'}) is None
     True
     """
+    results = []
 
-    full_hash = "%3A".join([hash_dict['package_hash'], hash_dict['version_hash']])
-    #remove initial and final lines from html with [4:-3] slice then extract hash with split('"'). Dictionary consists of {hash: url}.
-    urls = {n.split('"')[1][:-2]: n.split('"')[1] for n in urllib2.urlopen("https://depot.galaxyproject.org/singularity/").read().split("\n")[4:-3]}
-    return urls.get(full_hash) # returns the url if present, otherwise None
+    containers = get_singularity_containers()
+
+    for container in containers:
+        if search_string in container:
+            name = container.split(':')[0] 
+            # try:
+            #     version, build = container.split(':')[1].split('--')
+            # except ValueError:
+            #     version, build = container.split(':')[1], None
+            version = container.split(':')[1]
+            results.append({'package': name, 'version': version}) #, 'build': build})
+
+    # full_hash = "%3A".join([hash_dict['package_hash'], hash_dict['version_hash']])
+    # #remove initial and final lines from html with [4:-3] slice then extract hash with split('"'). Dictionary consists of {hash: url}.
+    # urls = {n.split('"')[1][:-2]: n.split('"')[1] for n in urllib2.urlopen("https://depot.galaxyproject.org/singularity/").read().split("\n")[4:-3]}
+    # return urls.get(full_hash) # returns the url if present, otherwise None
+    
+    #results = [{'name': result.split(':')[0], 'version': result.split(':')[1].split('--')[0], 'build': }]
+    return results
+
+def readable_output(json):
+    # sum([len(json[destination][results]) for destination in json for results in json[destination]])
+    # print([json[destination[results]] for destination in json for results in json[destination]])
+
+    if sum([len(json[destination][results]) for destination in json for results in json[destination]]) == 0: #if json is empty:
+        sys.stdout.write('No results found for that query.\n')
+        return
+
+    if sum([len(json[destination][results]) for destination in ['quay', 'conda', 'singularity'] for results in json.get(destination, [])]) > 0:
+        sys.stdout.write("The query returned the following result(s).\n")
+        lines = [['LOCATION', 'NAME', 'VERSION', 'COMMAND\n']] # put quay, conda etc results as lists in lines
+        for search_string, results in json.get('quay', {}).items():
+            for result in results:
+                lines.append(['quay', result['package'], result['version'], 'quay.io/biocontainers/%s:%s\n' % (result['package'], result['version'])]) # NOT a real solution
+        for search_string, results in json.get('conda', {}).items():
+            for result in results:
+                lines.append(['conda', result['package'], result['version'], 'conda install -c bioconda %s=%s\n' % (result['package'], result['version'])])
+        for search_string, results in json.get('singularity', {}).items():
+            for result in results:
+                lines.append(['singularity', result['package'], result['version'], 'wget https://depot.galaxyproject.org/singularity/%s:%s\n' % (result['package'], result['version'])])
+        
+        col_width0, col_width1, col_width2 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1, 2)) # def max col widths for the output
+
+        for line in lines:
+            sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2].ljust(col_width2), line[3]))) #output
+
+
+    if sum([len(json['github'][results]) for results in json.get('github', [])]) > 0:
+        sys.stdout.write('\n' if 'lines' in locals() else '')
+        sys.stdout.write("Result(s) on the bioconda-recipes GitHub repository:\n")
+        lines = [['QUERY', 'FILE', 'URL\n']]
+        for search_string, results in json.get('github', {}).items():
+            for result in results:
+                lines.append([search_string, result['name'], 'https://github.com/bioconda/bioconda-recipes/tree/master/%s\n' % result['path']])
+
+    col_width0, col_width1 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1)) # def max col widths for the output
+
+    for line in lines:
+        sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2]))) #output
+
 
 def main(argv=None):
     if Schema == None:
@@ -362,30 +417,34 @@ def main(argv=None):
         return
 
     parser = argparse.ArgumentParser(description='Searches in a given quay organization for a repository')
-    parser.add_argument('-d', '--destination', dest='search_dest', nargs='+', default=['quay', 'conda'],
-                        help="Choose where to search. Options are 'conda' and 'quay'. If no option are given, all will be searched.")
+    parser.add_argument('-d', '--destination', dest='search_dest', nargs='+', default=['quay', 'conda', 'singularity'],
+                        help="Choose where to search. Options are 'conda', 'quay', 'singularity' and 'github'. If no option are given, all will be searched.")
     parser.add_argument('-o', '--organization', dest='organization_string', default="biocontainers",
-                        help='Change quay organization. Default is biocontainers.')
+                        help='Change quay organization to search; default is biocontainers.')
     parser.add_argument('--non-strict', dest='non_strict', action="store_true",
                         help='Autocorrection of typos activated. Lists more results but can be confusing.\
                         For too many queries quay.io blocks the request and the results can be incomplete.')
-    parser.add_argument('--json', dest='json', action="store_true", help='Returns results as JSON.')
+    parser.add_argument('-j', '--json', dest='json', action="store_true", help='Returns results as JSON.')
     parser.add_argument('-s', '--search', required=True, nargs='+',
-                        help='The name of the tool you want to search for.')
-    parser.add_argument('-v', '--version', dest='version', action="store_true", help="Filter results by version numbers, which must be given with the package names.")
+                        help='The name of the tool(s) to search for.')
+    #parser.add_argument('-v', '--version', dest='version', action="store_true", help="Filter results by version numbers, which must be given with the package names.")
 
     args = parser.parse_args()
 
     json_results = {dest: None for dest in args.search_dest}
 
     versions = {}
-    if args.version: # extract the version numbers from args.search_dest
-        try:
-            versions = {n.split('=')[0]: n.split('=')[1] for n in args.search}
-            args.search = [n.split('=')[0] for n in args.search]
-        except IndexError:
-            logging.error("Please include a version number for every package you wish to search. Alternatively, remove the --version tag.")
-            return
+    # if args.version: # extract the version numbers from args.search_dest
+    #     try:
+    #         versions = {n.split('=')[0]: n.split('=')[1] for n in args.search}
+    #         args.search = [n.split('=')[0] for n in args.search]
+    #     except IndexError:
+    #         logging.error("Please include a version number for every package you wish to search. Alternatively, remove the --version tag.")
+    #         return
+
+    if len(args.search) > 1: # get hash if multiple packages are searched
+        #json_results['hash'] = get_package_hash(args.search, versions)
+        args.search.append(get_package_hash(args.search, versions)['package_hash'])
 
     if 'conda' in args.search_dest:
         conda_results = {}
@@ -402,13 +461,9 @@ def main(argv=None):
 
         for item in args.search:
             github_json = github.get_json(item)
-            json_results['github'] = github.process_json(github_json, item)
+            github_results[item] = github.process_json(github_json, item)
+        json_results['github'] = github_results
 
-    # if 'other' in args.search_dest:
-        # implement other options
-
-    if len(args.search) > 1: # get hash if multiple packages are searched
-        json_results['hash'] = get_package_hash(args.search, versions)
 
     if 'quay' in args.search_dest:
         quay_results = {}
@@ -418,27 +473,37 @@ def main(argv=None):
         for item in args.search:
             quay_results[item] = quay.search_repository(item, args.non_strict)
             
-        if args.version: # if the version tag is on, filter by version
-            for p in args.search:
-                quay_results[p] = [q for q in quay_results[p] if q['version'] == versions[p]]
+        # if args.version: # if the version tag is on, filter by version
+        #     for p in args.search:
+        #         quay_results[p] = [q for q in quay_results[p] if q['version'] == versions[p]]
 
         json_results['quay'] = quay_results
 
     if 'singularity' in args.search_dest:
-        if 'hash' in json_results:
-            json_results['singularity'] = singularity_search(json_results['hash'])
-        else:
-            print("No hash available, probably because only one package was searched.")
+        singularity_results = {}
+        for item in args.search:
+            singularity_results[item] = singularity_search(item)
+        json_results['singularity'] = singularity_results
+        # if 'hash' in json_results:
+        #     json_results['singularity'] = singularity_search(json_results['hash'])
+        # else:
+        #     print("No hash available, probably because only one package was searched.")
 
+    # if 'other' in args.search_dest:
+        # implement other options
+    
     if args.json:
         # return format as json.
         print(json_results)
     else:
         # pretty formatting stuff here
-        print("Not yet implemented.")
+        #print("Not yet implemented.")
+        readable_output(json_results)
 
 if __name__ == "__main__":
     main()
 
     #import doctest
     #doctest.testmod()
+
+    # readable_output({'conda': {'bamtools': [{'version': u'2.3.0--0', 'package': u'bamtools'}, {'version': u'2.4.0--0', 'package': u'bamtools'}, {'version': u'2.4.0--1', 'package': u'bamtools'}, {'version': u'2.4.0--2', 'package': u'bamtools'}, {'version': u'2.4.0--3', 'package': u'bamtools'}, {'version': u'2.4.1--0', 'package': u'bamtools'}], 'samtools': [{'version': u'1.22.0--r3.2.2_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.22.0--r3.2.2_1', 'package': u'bioconductor-rsamtools'}, {'version': u'1.24.0--r3.3.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.26.1--r3.3.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.26.1--r3.3.2_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.26.1--r3.4.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.28.0--r3.4.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.30.0--r3.4.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'0.1.12--0', 'package': u'samtools'}, {'version': u'0.1.12--1', 'package': u'samtools'}, {'version': u'0.1.13--0', 'package': u'samtools'}, {'version': u'0.1.14--0', 'package': u'samtools'}, {'version': u'0.1.15--0', 'package': u'samtools'}, {'version': u'0.1.16--0', 'package': u'samtools'}, {'version': u'0.1.17--0', 'package': u'samtools'}, {'version': u'0.1.18--0', 'package': u'samtools'}, {'version': u'0.1.19--0', 'package': u'samtools'}, {'version': u'0.1.19--1', 'package': u'samtools'}, {'version': u'0.1.19--2', 'package': u'samtools'}, {'version': u'1.0--0', 'package': u'samtools'}, {'version': u'1.1--0', 'package': u'samtools'}, {'version': u'1.2--0', 'package': u'samtools'}, {'version': u'1.2--1', 'package': u'samtools'}, {'version': u'1.2--2', 'package': u'samtools'}, {'version': u'1.3--0', 'package': u'samtools'}, {'version': u'1.3--1', 'package': u'samtools'}, {'version': u'1.3--2', 'package': u'samtools'}, {'version': u'1.3.1--0', 'package': u'samtools'}, {'version': u'1.3.1--1', 'package': u'samtools'}, {'version': u'1.3.1--2', 'package': u'samtools'}, {'version': u'1.3.1--3', 'package': u'samtools'}, {'version': u'1.3.1--4', 'package': u'samtools'}, {'version': u'1.3.1--5', 'package': u'samtools'}, {'version': u'1.4--0', 'package': u'samtools'}, {'version': u'1.4.1--0', 'package': u'samtools'}, {'version': u'1.5--0', 'package': u'samtools'}, {'version': u'1.5--1', 'package': u'samtools'}, {'version': u'1.5--2', 'package': u'samtools'}, {'version': u'1.6--0', 'package': u'samtools'}, {'version': u'1.43--0', 'package': u'perl-bio-samtools'}], 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa': []}, 'singularity': {'bamtools': [{'version': 'bamtools', 'package': 'bamtools'}, {'version': 'bamtools', 'package': 'bamtools'}], 'samtools': [{'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}], 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa': [{'version': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}, {'version': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}]}, 'quay': {'bamtools': [{'version': u'2.4.0--3', 'package': u'bamtools'}, {'version': u'2.4.1--0', 'package': u'bamtools'}], 'samtools': [{'version': u'0.1.19--2', 'package': u'samtools'}, {'version': u'1.3.1--4', 'package': u'samtools'}, {'version': u'1.3.1--3', 'package': u'samtools'}, {'version': u'1.3.1--2', 'package': u'samtools'}, {'version': u'0.1.14--0', 'package': u'samtools'}, {'version': u'0.1.12--1', 'package': u'samtools'}, {'version': u'0.1.12--0', 'package': u'samtools'}, {'version': u'0.1.15--0', 'package': u'samtools'}, {'version': u'1.3.1--5', 'package': u'samtools'}, {'version': u'1.5--2', 'package': u'samtools'}, {'version': u'1.4.1--0', 'package': u'samtools'}, {'version': u'1.6--0', 'package': u'samtools'}, {'version': u'1.5--0', 'package': u'samtools'}, {'version': u'0.1.13--0', 'package': u'samtools'}, {'version': u'1.0--0', 'package': u'samtools'}, {'version': u'1.5--1', 'package': u'samtools'}, {'version': u'latest', 'package': u'samtools'}, {'version': u'1.3--1', 'package': u'samtools'}, {'version': u'1.3--2', 'package': u'samtools'}, {'version': u'1.4--0', 'package': u'samtools'}, {'version': u'1.43--0', 'package': u'perl-bio-samtools'}], 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa': [{'version': u'fc33176431a4b9ef3213640937e641d731db04f1-0', 'package': u'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}, {'version': u'c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'package': u'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}]}})

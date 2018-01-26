@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import requests
 from lxml import html
 import subprocess
@@ -10,14 +12,15 @@ import logging
 from shutil import copy
 import pickle
 import json
+import argparse
 
 from glob import glob
 
 yaml = YAML()
 yaml.allow_duplicate_keys = True
 
-SINGULARITY_DESTINATION = "summat" # file destination for singularity containers
-SINGULARITY_INSTALL = "/usr/local/bin/singularity" # location at which singularity is installed, could be something else like /usr/local/bin/singularity
+SINGULARITY_DESTINATION = "/data/0/cvmfs/singularity" # file destination for singularity containers
+SINGULARITY_INSTALL = "/opt/singularity/bin/singularity" # location at which singularity is installed, could be something else like /usr/local/bin/singularity
 QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 
 def get_quay_containers():
@@ -62,10 +65,11 @@ def get_singularity_containers():
     index = requests.get(index_url)
     #l = response.text.split('\n')
     tree = html.fromstring(index.content)
-    containers = tree.xpath('//a/text()')
+    containers = tree.xpath('//a/@href')
+    containers = [container.replace('%3A', ':') for container in containers]
     return containers
 
-def get_missing_containers(quay_list=get_quay_containers(), singularity_list=get_singularity_containers(), blacklist_file=None):
+def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     """
     Returns list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
     # >>> lst = get_missing_containers()
@@ -98,8 +102,7 @@ def docker_to_singularity(container):
     # """
 
     try:
-        check_output("sudo singularity build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" % (SINGULARITY_DESTINATION, container, container), stderr=subprocess.STDOUT, shell=True)
-    	#check_output("echo %s" % container , stderr=subprocess.STDOUT, shell=True)
+        check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, container), stderr=subprocess.STDOUT, shell=True)
     except subprocess.CalledProcessError as e:
         error_info = {'code': e.returncode, 'cmd': e.cmd, 'out': e.output}
         return error_info
@@ -246,7 +249,7 @@ def test_singularity_container(tests):
                         try:
                             check_output("%s exec -H /tmp/foo %s/%s %s" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, command), stderr=subprocess.STDOUT, shell=True)
                         except subprocess.CalledProcessError as e2:
-                            errors.append({'command': test, 'output': e2.output})
+                            errors.append({'command': command, 'output': e2.output})
                             test_passed = False
                         
             if test.get('imports', False):
@@ -254,7 +257,7 @@ def test_singularity_container(tests):
                     try:
                         check_output("%s exec -H /tmp/foo %s/%s %s 'import %s'" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, test['import_lang'], imp), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e:
-                        errors.append({'import': test, 'output': e.output})
+                        errors.append({'import': imp, 'output': e.output})
                         test_passed = False
 
             if test_passed:
@@ -263,9 +266,6 @@ def test_singularity_container(tests):
                 test['errors'] = errors
                 test_results['failed'].append(test)
     return test_results
-
-
-
 
 def move_passed_containers(containers, destination):
     # """
@@ -291,39 +291,55 @@ def main():
                         help="Skip testing of generated containers (not recommended).")
     parser.add_argument('-m', '--move', dest='move', default=None,
                         help="Move successfully tested containers to a new destination.")
-    parser.add_argument('-f', '--file', dest='passed_container_destination', default=None,
-                        help="Output the tests to the chosen destination as a file. Otherwise, output will be returned to terminal.")
+    # parser.add_argument('-f', '--file', dest='passed_container_destination', default=None,
+    #                     help="Output the tests to the chosen destination as a file. Otherwise, output will be returned to terminal.")
     parser.add_argument('-b', '--blacklist', dest='blacklist', default=None, 
                         help="Provide a 'blacklist file' containing containers which should not be processed.")
+    parser.add_argument('-o', '--logfile', dest='logfile', default='singularity.log',
+                        help="Filename for a log to be written to.")
     #parser.add_argument()
     args = parser.parse_args()
 
     #get_quay_containers()
     #get_singularity_containers()
     if not args.containers:
-        containers = get_missing_containers(blacklist_file=args.blacklist)
+        containers = get_missing_containers(quay_list=get_quay_containers(), singularity_list=get_singularity_containers(), blacklist_file=args.blacklist)
+        #containers = get_missing_containers(blacklist_file=args.blacklist)
     else:
         containers = args.containers
 
-    for container in containers:
-        docker_to_singularity(container)
+    with open(args.logfile, 'w') as f:
+        f.write("SINGULARITY CONTAINERS GENERATED:")
 
-    if not no_testing:
-        tests = []
         for container in containers:
-            if container[0:6] == 'mulled': # if it is a 'hashed container'
-                test = mulled_get_test(container)
-            else:
-                test = get_test(container)
-            tests.append(test)
-        test_results = test_singularity_container(tests)
+            docker_to_singularity(container)
 
-    if move:
-        move_passed_containers(test_results['passed'], passed_container_destination)
+        if not args.no_testing:
+            tests = {}
+            for container in containers:
+                if container[0:6] == 'mulled': # if it is a 'hashed container'
+                    tests[container] = mulled_get_test(container)
+                else:
+                    tests[container] = get_test(container)
+            test_results = test_singularity_container(tests)
+    
+            f.write('\n\tTEST PASSED:')
+            for container in test_results['passed']:
+                f.write('\n\t\t%s' % container)
+            f.write('\n\tTEST FAILED:')
+            for container in test_results['failed']:
+                f.write('\n\t\t%s' % container['container'])
+                for error in container['errors']:
+                    f.write('\n\t\t\tCOMMAND: %s\n\t\t\t\tERROR:%s' % (error.get('command', 'import' + error.get('import', 'nothing found')), error['output']))                
+            f.write('\n\tNO TEST AVAILABLE:')
+            for container in test_results['notest']:
+                f.write('\n\t\t%s' % container)
+        else:
+            for container in containers:
+                f.write('\n\t%s' % container)
 
-    if passed_container_destination:
-        with open('passed_container_destination', 'wb') as f:
-            pickle.dump(test_results, f, protocol=pickle.HIGHEST_PROTOCOL)
+        if args.move:
+            move_passed_containers(test_results['passed'], args.move)
 
 if __name__ == "__main__":
     main()

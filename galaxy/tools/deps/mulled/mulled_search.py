@@ -97,31 +97,9 @@ class QuaySearch():
             for result in results:
                 title = result['title']
                 for version in self.get_additional_repository_information(title):
-                    # try:
-                    #     version, build = version.split('--')
-                    # except ValueError:
-                    #     version, build = version, None
-                    out.append({'package': title, 'version': version,}) # 'build': build})
+                    out.append({'package': title, 'version': version,})
 
             return out
-
-
-            # sys.stdout.write("The query \033[1m %s \033[0m resulted in %s Docker result(s) with %s available version(s).\n" % (search_string, len(results), len(out)))
-
-            # if non_strict:
-            #     sys.stdout.write('The search was relaxed and the following search terms were searched: ')
-            #     sys.stdout.write('\033[1m %s \033[0m\n' % ', '.join(suggestions))
-
-            # if out:
-            #     col_width = max(len(word) for row in out for word in row) + 2  # padding
-            #     for row in out:
-            #         name = row[0]
-            #         version = row[1]
-            #         sys.stdout.write("".join(word.ljust(col_width) for word in row) + "docker pull quay.io/%s/%s:%s\n" % (self.organization, name, version))
-            # else:
-            #     sys.stdout.write("No results found for %s in quay.io/%s.\n" % (search_string, self.organization))
-
-            
 
     def get_additional_repository_information(self, repository_string):
         """
@@ -146,8 +124,6 @@ class CondaSearch():
     []
     >>> {'version': u'2.2.0', 'build': u'0', 'package': u'bioconductor-gosemsim'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
     True
-
-
     """
 
     def get_json(self, search_string):
@@ -165,64 +141,17 @@ class CondaSearch():
         Function takes JSON input and processes it, returning the required data
         """
         results = []
-        #no_of_packages = 0
-        #no_of_versions = 0
 
         if json_input.get('exception_name', False):
             return results # if the search fails, probably because there are no results
 
         for package_name, package_info in json_input.iteritems():
-            #no_of_packages += 1
             for item in package_info:
-                #build = item['build']
                 version = item['version']
                 if {'package': package_name, 'version': version} not in results: # don't duplicate results
                     results.append({'package': package_name, 'version': version})
                     #no_of_versions += 1
         return results
-
-    # def print_output(json_input):
-
-    #     col_width = 30
-    #     col_width = max(len(word) for result in results for word in result) + 2  # padding
-
-    #     sys.stdout.write("\nThe query \033[1m %s \033[0m resulted in %s bioconda result(s) with %s available version(s).\n" % (search_string, no_of_packages, no_of_versions))
-
-    #     for result in results:
-    #         sys.stdout.write("".join([result[0].ljust(col_width), (result[2] + "--" + result[1]).ljust(col_width)]) + "conda install -c bioconda %s=%s\n" % (result[0], result[2]))
-            
-
-    # def search(self, search_string):
-    #     conda_output = subprocess.Popen("conda search %s -c bioconda" % (search_string), shell=True, stdout=subprocess.PIPE)
-        
-    #     try:
-    #         lines = []
-    #         for line in conda_output:
-    #             #sys.stdout.write(line)
-    #             lst = line.split()
-    #             del lst[-1]
-    #             lines.append(lst)
-    #         del lines[0]
-
-        #     results = 0   
-            # for line in lines:
-        #         #package = None
-        #         try:
-        #             int(line[0][0])
-        #             line.insert(0, package)
-        #         except ValueError:
-        #             package = line[0]
-        #             results += 1
-        #     col_width = max(len(word) for row in lines for word in row) + 2  # padding
-
-        #     sys.stdout.write("\nThe query \033[1m %s \033[0m resulted in %s bioconda result(s) with %s available version(s).\n" % (search_string, results, len(lines)))
-
-        #     for line in lines:
-        #         sys.stdout.write("".join([line[0].ljust(col_width), (line[1] + "--" + line[2]).ljust(col_width)]) + "conda install -c bioconda %s=%s\n" % (line[0], line[1]))
-        
-        # except ValueError:
-        #     sys.stdout.write("No conda packages were found matching '%s'.\n" % search_string)
-
 
 
 class GitHubSearch():
@@ -237,12 +166,7 @@ class GitHubSearch():
     []
     >>> {'path': u'recipes/bioconductor-gosemsim/build.sh', 'name': u'build.sh'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
     True
-
-        
     """
-
-    #def __init__(self, organization):
-    #    self.organization = organization
 
     def get_json(self, search_string):
         """
@@ -264,12 +188,6 @@ class GitHubSearch():
             results.append({'name': result['name'], 'path': result['path']})
         return results
 
-        # print "Here are the best matches for the query provided."    
-        
-        # col_width = max(len(result['name']) for result in json) + 2  # padding
-        # for result in json:
-        #     sys.stdout.write("".join([result['name'].ljust(col_width), "https://github.com/bioconda/bioconda-recipes/tree/master/" + result['path'] + "\n"]))
-    
     def recipe_present(self, search_string):
         """
         Checks if a recipe exists in bioconda-recipes which matches search_string exactly
@@ -290,13 +208,6 @@ class GitHubSearch():
             recipe_present = True
         except urllib2.HTTPError:
             recipe_present = False
-
-        #if recipe_present:
-        #    print "A recipe named %s is present in the GitHub repository at the following URL:" % search_string
-        #    print "https://github.com/bioconda/bioconda-recipes/tree/master/recipes/%s" % search_string
-
-        #else:
-        #    print "No recipe with the name %s could be found." % search_string
 
         return recipe_present
 
@@ -354,25 +265,13 @@ def singularity_search(search_string):
 
     for container in containers:
         if search_string in container:
-            name = container.split(':')[0] 
-            # try:
-            #     version, build = container.split(':')[1].split('--')
-            # except ValueError:
-            #     version, build = container.split(':')[1], None
+            name = container.split(':')[0]
             version = container.split(':')[1]
-            results.append({'package': name, 'version': version}) #, 'build': build})
+            results.append({'package': name, 'version': version})
 
-    # full_hash = "%3A".join([hash_dict['package_hash'], hash_dict['version_hash']])
-    # #remove initial and final lines from html with [4:-3] slice then extract hash with split('"'). Dictionary consists of {hash: url}.
-    # urls = {n.split('"')[1][:-2]: n.split('"')[1] for n in urllib2.urlopen("https://depot.galaxyproject.org/singularity/").read().split("\n")[4:-3]}
-    # return urls.get(full_hash) # returns the url if present, otherwise None
-    
-    #results = [{'name': result.split(':')[0], 'version': result.split(':')[1].split('--')[0], 'build': }]
     return results
 
 def readable_output(json):
-    # sum([len(json[destination][results]) for destination in json for results in json[destination]])
-    # print([json[destination[results]] for destination in json for results in json[destination]])
 
     if sum([len(json[destination][results]) for destination in json for results in json[destination]]) == 0: #if json is empty:
         sys.stdout.write('No results found for that query.\n')
@@ -427,23 +326,12 @@ def main(argv=None):
     parser.add_argument('-j', '--json', dest='json', action="store_true", help='Returns results as JSON.')
     parser.add_argument('-s', '--search', required=True, nargs='+',
                         help='The name of the tool(s) to search for.')
-    #parser.add_argument('-v', '--version', dest='version', action="store_true", help="Filter results by version numbers, which must be given with the package names.")
 
     args = parser.parse_args()
-
     json_results = {dest: None for dest in args.search_dest}
-
     versions = {}
-    # if args.version: # extract the version numbers from args.search_dest
-    #     try:
-    #         versions = {n.split('=')[0]: n.split('=')[1] for n in args.search}
-    #         args.search = [n.split('=')[0] for n in args.search]
-    #     except IndexError:
-    #         logging.error("Please include a version number for every package you wish to search. Alternatively, remove the --version tag.")
-    #         return
 
     if len(args.search) > 1: # get hash if multiple packages are searched
-        #json_results['hash'] = get_package_hash(args.search, versions)
         args.search.append(get_package_hash(args.search, versions)['package_hash'])
 
     if 'conda' in args.search_dest:
@@ -473,10 +361,6 @@ def main(argv=None):
         for item in args.search:
             quay_results[item] = quay.search_repository(item, args.non_strict)
             
-        # if args.version: # if the version tag is on, filter by version
-        #     for p in args.search:
-        #         quay_results[p] = [q for q in quay_results[p] if q['version'] == versions[p]]
-
         json_results['quay'] = quay_results
 
     if 'singularity' in args.search_dest:
@@ -484,20 +368,10 @@ def main(argv=None):
         for item in args.search:
             singularity_results[item] = singularity_search(item)
         json_results['singularity'] = singularity_results
-        # if 'hash' in json_results:
-        #     json_results['singularity'] = singularity_search(json_results['hash'])
-        # else:
-        #     print("No hash available, probably because only one package was searched.")
-
-    # if 'other' in args.search_dest:
-        # implement other options
     
     if args.json:
-        # return format as json.
         print(json_results)
     else:
-        # pretty formatting stuff here
-        #print("Not yet implemented.")
         readable_output(json_results)
 
 if __name__ == "__main__":
@@ -505,5 +379,3 @@ if __name__ == "__main__":
 
     #import doctest
     #doctest.testmod()
-
-    # readable_output({'conda': {'bamtools': [{'version': u'2.3.0--0', 'package': u'bamtools'}, {'version': u'2.4.0--0', 'package': u'bamtools'}, {'version': u'2.4.0--1', 'package': u'bamtools'}, {'version': u'2.4.0--2', 'package': u'bamtools'}, {'version': u'2.4.0--3', 'package': u'bamtools'}, {'version': u'2.4.1--0', 'package': u'bamtools'}], 'samtools': [{'version': u'1.22.0--r3.2.2_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.22.0--r3.2.2_1', 'package': u'bioconductor-rsamtools'}, {'version': u'1.24.0--r3.3.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.26.1--r3.3.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.26.1--r3.3.2_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.26.1--r3.4.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.28.0--r3.4.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'1.30.0--r3.4.1_0', 'package': u'bioconductor-rsamtools'}, {'version': u'0.1.12--0', 'package': u'samtools'}, {'version': u'0.1.12--1', 'package': u'samtools'}, {'version': u'0.1.13--0', 'package': u'samtools'}, {'version': u'0.1.14--0', 'package': u'samtools'}, {'version': u'0.1.15--0', 'package': u'samtools'}, {'version': u'0.1.16--0', 'package': u'samtools'}, {'version': u'0.1.17--0', 'package': u'samtools'}, {'version': u'0.1.18--0', 'package': u'samtools'}, {'version': u'0.1.19--0', 'package': u'samtools'}, {'version': u'0.1.19--1', 'package': u'samtools'}, {'version': u'0.1.19--2', 'package': u'samtools'}, {'version': u'1.0--0', 'package': u'samtools'}, {'version': u'1.1--0', 'package': u'samtools'}, {'version': u'1.2--0', 'package': u'samtools'}, {'version': u'1.2--1', 'package': u'samtools'}, {'version': u'1.2--2', 'package': u'samtools'}, {'version': u'1.3--0', 'package': u'samtools'}, {'version': u'1.3--1', 'package': u'samtools'}, {'version': u'1.3--2', 'package': u'samtools'}, {'version': u'1.3.1--0', 'package': u'samtools'}, {'version': u'1.3.1--1', 'package': u'samtools'}, {'version': u'1.3.1--2', 'package': u'samtools'}, {'version': u'1.3.1--3', 'package': u'samtools'}, {'version': u'1.3.1--4', 'package': u'samtools'}, {'version': u'1.3.1--5', 'package': u'samtools'}, {'version': u'1.4--0', 'package': u'samtools'}, {'version': u'1.4.1--0', 'package': u'samtools'}, {'version': u'1.5--0', 'package': u'samtools'}, {'version': u'1.5--1', 'package': u'samtools'}, {'version': u'1.5--2', 'package': u'samtools'}, {'version': u'1.6--0', 'package': u'samtools'}, {'version': u'1.43--0', 'package': u'perl-bio-samtools'}], 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa': []}, 'singularity': {'bamtools': [{'version': 'bamtools', 'package': 'bamtools'}, {'version': 'bamtools', 'package': 'bamtools'}], 'samtools': [{'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'bioconductor-rsamtools', 'package': 'bioconductor-rsamtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}, {'version': 'samtools', 'package': 'samtools'}], 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa': [{'version': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}, {'version': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}]}, 'quay': {'bamtools': [{'version': u'2.4.0--3', 'package': u'bamtools'}, {'version': u'2.4.1--0', 'package': u'bamtools'}], 'samtools': [{'version': u'0.1.19--2', 'package': u'samtools'}, {'version': u'1.3.1--4', 'package': u'samtools'}, {'version': u'1.3.1--3', 'package': u'samtools'}, {'version': u'1.3.1--2', 'package': u'samtools'}, {'version': u'0.1.14--0', 'package': u'samtools'}, {'version': u'0.1.12--1', 'package': u'samtools'}, {'version': u'0.1.12--0', 'package': u'samtools'}, {'version': u'0.1.15--0', 'package': u'samtools'}, {'version': u'1.3.1--5', 'package': u'samtools'}, {'version': u'1.5--2', 'package': u'samtools'}, {'version': u'1.4.1--0', 'package': u'samtools'}, {'version': u'1.6--0', 'package': u'samtools'}, {'version': u'1.5--0', 'package': u'samtools'}, {'version': u'0.1.13--0', 'package': u'samtools'}, {'version': u'1.0--0', 'package': u'samtools'}, {'version': u'1.5--1', 'package': u'samtools'}, {'version': u'latest', 'package': u'samtools'}, {'version': u'1.3--1', 'package': u'samtools'}, {'version': u'1.3--2', 'package': u'samtools'}, {'version': u'1.4--0', 'package': u'samtools'}, {'version': u'1.43--0', 'package': u'perl-bio-samtools'}], 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa': [{'version': u'fc33176431a4b9ef3213640937e641d731db04f1-0', 'package': u'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}, {'version': u'c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'package': u'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}]}})

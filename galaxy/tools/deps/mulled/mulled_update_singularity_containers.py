@@ -24,16 +24,16 @@ SINGULARITY_INSTALL = "/opt/singularity/bin/singularity" # location at which sin
 QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 
 def get_quay_containers():
-    # """
-    # Gets all quay containers in the biocontainers repo
-    # >>> lst = get_quay_containers()
-    # >>> 'samtools:latest' in lst
-    # True
-    # >>> 'abricate:0.4--pl5.22.0_0' in lst
-    # True
-    # >>> 'samtools' in lst
-    # False
-    # """
+    """
+    Gets all quay containers in the biocontainers repo
+    >>> lst = get_quay_containers()
+    >>> 'samtools:latest' in lst
+    True
+    >>> 'abricate:0.4--pl5.22.0_0' in lst
+    True
+    >>> 'samtools' in lst
+    False
+    """
     containers = []
 
     repos_parameters = {'public': 'true', 'namespace': 'biocontainers'}
@@ -42,8 +42,9 @@ def get_quay_containers():
 
     repos = repos_response.json()['repositories']
     #repos = [n['name'] for n in repos]
-    
+
     for repo in repos:
+        logging.info(repo)
         tags_response = requests.get("%s/biocontainers/%s" % (QUAY_API_ENDPOINT, repo['name']))
         tags = tags_response.json()['tags']
         for tag in tags:
@@ -52,13 +53,13 @@ def get_quay_containers():
     return containers
 
 def get_singularity_containers():
-    # """
-    # Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
-    # >>> lst = get_singularity_containers()
-    # >>> 'aragorn:1.2.36--1' in lst
-    # True
-    # >>> 'znc:latest' in lst
-    # False
+    """
+    Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
+    >>> lst = get_singularity_containers()
+    >>> 'aragorn:1.2.36--1' in lst
+    True
+    >>> 'znc:latest' in lst
+    False
 
     # """
     index_url = "https://depot.galaxyproject.org/singularity/"
@@ -72,17 +73,17 @@ def get_singularity_containers():
 def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     """
     Returns list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
-    # >>> lst = get_missing_containers()
-    # >>> 'aragorn:1.2.36--1' in lst
-    # False
-    # >>> 'znc:latest' in lst
-    # False
-    # >>> 'pybigwig:0.1.11--py36_0' in lst
-    # True
-    # >>> 'samtools' in lst
-    # False
-    # >>> get_missing_containers(quay_list=[1, 2, 3, 'h', 'g', 'r'], singularity_list=[3, 4, 5], blacklist_file='blacklist.txt')
-    # [1, 2, 'h']
+    >>> lst = get_missing_containers()
+    >>> 'aragorn:1.2.36--1' in lst
+    False
+    >>> 'znc:latest' in lst
+    False
+    >>> 'pybigwig:0.1.11--py36_0' in lst
+    True
+    >>> 'samtools' in lst
+    False
+    >>> get_missing_containers(quay_list=[1, 2, 3, 'h', 'g', 'r'], singularity_list=[3, 4, 5], blacklist_file='blacklist.txt')
+    [1, 2, 'h']
 
     """
     blacklist = []
@@ -91,15 +92,15 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     return [n for n in quay_list if n not in singularity_list and n not in blacklist]
 
 def docker_to_singularity(container):
-    # """
-    # Convert docker to singularity container
-    # >>> from glob import glob
-    # >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
-    # []
-    # >>> docker_to_singularity('abundancebin:1.0.1--0')
-    # >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
-    # ['summat/abundancebin:1.0.1--0']
-    # """
+    """
+    Convert docker to singularity container
+    >>> from glob import glob
+    >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
+    []
+    >>> docker_to_singularity('abundancebin:1.0.1--0')
+    >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
+    ['summat/abundancebin:1.0.1--0']
+    """
 
     try:
         check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, container), stderr=subprocess.STDOUT, shell=True)
@@ -110,18 +111,17 @@ def docker_to_singularity(container):
         return None
 
 
-
 def get_test(container):
-    # """
-    # Downloading tarball from anaconda for test
-    # >>> get_test('abundancebin:1.0.1--0')
-    # {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'import_lang': 'python -c', 'container': 'abundancebin:1.0.1--0'}
-    # >>> get_test('snakemake:3.11.2--py34_1')
-    # {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
-    # >>> get_test('perl-yaml:1.15--pl5.22.0_0')
-    # {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
+    """
+    Downloading tarball from anaconda for test
+    >>> get_test('abundancebin:1.0.1--0')
+    {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'import_lang': 'python -c', 'container': 'abundancebin:1.0.1--0'}
+    >>> get_test('snakemake:3.11.2--py34_1')
+    {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
+    >>> get_test('perl-yaml:1.15--pl5.22.0_0')
+    {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
 
-    # """
+    """
     package_tests = {}
     name = container.replace('--', ':').split(':') # list consisting of [name, version, (build, if present)]
 
@@ -177,12 +177,11 @@ def get_test(container):
     return package_tests # {'commands': ...}
 
 
-
 def mulled_get_test(container):
     """
     Gets test for hashed containers
-    # >>> print(mulled_get_test('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'))
-    # {'commands': ['bamtools --help', 'samtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
+    >>> print(mulled_get_test('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'))
+    {'commands': ['bamtools --help', 'samtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
 
     """
 
@@ -221,13 +220,13 @@ def mulled_get_test(container):
 def test_singularity_container(tests):
     """
     Run tests, record if they pass or fail
-    # >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'blat:35--1': {'commands': ['#!/bin/bash && set +e && blat > /dev/null 2>&1 && if [[ $? -eq 255 ]] && then && \texit 0 && else && \texit 1 && fi && ']}, 'blat:35--1': {'commands': ['#!/bin/bash && set +e && blat > /dev/null 2>&1 && if [[ $? -eq 255 ]] && then && \texit 0 && else && \texit 1 && fi && ']}, 'yasm:1.3.0--0': {}})
-    # >>> 'blat:35--1' in results['passed']
-    # True
-    # >>> 'pybigwig:0.1.11--py36_0' in results['failed']
-    # True
-    # >>> 'yasm:1.3.0--0' in results['notest']
-    # True
+    >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'blat:35--1': {'commands': ['#!/bin/bash && set +e && blat > /dev/null 2>&1 && if [[ $? -eq 255 ]] && then && \texit 0 && else && \texit 1 && fi && ']}, 'blat:35--1': {'commands': ['#!/bin/bash && set +e && blat > /dev/null 2>&1 && if [[ $? -eq 255 ]] && then && \texit 0 && else && \texit 1 && fi && ']}, 'yasm:1.3.0--0': {}})
+    >>> 'blat:35--1' in results['passed']
+    True
+    >>> 'pybigwig:0.1.11--py36_0' in results['failed']
+    True
+    >>> 'yasm:1.3.0--0' in results['notest']
+    True
     """
     test_results = {'passed': [], 'failed': [], 'notest': []}
     for container, test in tests.items():
@@ -267,21 +266,6 @@ def test_singularity_container(tests):
                 test_results['failed'].append(test)
     return test_results
 
-def move_passed_containers(containers, destination):
-    # """
-    # Moves a list of containers to the filepath indicated by destination.
-    # >>> glob('/home/ubuntu/summat2/znc:1')
-    # []
-    # >>> move_passed_containers(['znc:1'], 'summat2')
-    # >>> glob('/home/ubuntu/summat2/znc:1')
-    # ['/home/ubuntu/summat2/znc:1']
-    # """
-    try:
-        for container in containers:
-            copy('%s/%s' % (SINGULARITY_DESTINATION, container), destination)
-    except IOError:
-        logging.error('Copying containers failed - check destination is correct.')
-
 def main():
     
     parser = argparse.ArgumentParser(description='Updates index of singularity containers.')
@@ -289,22 +273,14 @@ def main():
                         help="Containers to be generated. If not given, all new additions to the quay biocontainers repository will be generated.")
     parser.add_argument('-nt', '--no-testing', dest='no_testing', action="store_true",
                         help="Skip testing of generated containers (not recommended).")
-    parser.add_argument('-m', '--move', dest='move', default=None,
-                        help="Move successfully tested containers to a new destination.")
-    # parser.add_argument('-f', '--file', dest='passed_container_destination', default=None,
-    #                     help="Output the tests to the chosen destination as a file. Otherwise, output will be returned to terminal.")
     parser.add_argument('-b', '--blacklist', dest='blacklist', default=None, 
                         help="Provide a 'blacklist file' containing containers which should not be processed.")
     parser.add_argument('-o', '--logfile', dest='logfile', default='singularity.log',
                         help="Filename for a log to be written to.")
-    #parser.add_argument()
     args = parser.parse_args()
 
-    #get_quay_containers()
-    #get_singularity_containers()
     if not args.containers:
         containers = get_missing_containers(quay_list=get_quay_containers(), singularity_list=get_singularity_containers(), blacklist_file=args.blacklist)
-        #containers = get_missing_containers(blacklist_file=args.blacklist)
     else:
         containers = args.containers
 
@@ -337,9 +313,6 @@ def main():
         else:
             for container in containers:
                 f.write('\n\t%s' % container)
-
-        if args.move:
-            move_passed_containers(test_results['passed'], args.move)
 
 if __name__ == "__main__":
     main()

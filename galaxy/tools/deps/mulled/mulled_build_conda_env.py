@@ -1,4 +1,5 @@
-import urllib2
+#!/usr/bin/env python
+import requests
 import json
 import argparse
 import logging
@@ -23,10 +24,10 @@ class EnvRequest():
         """
         If self.container is a hash, check what packages it refers to using GitHub.
         """
-        github_hashes = json.loads(urllib2.urlopen('https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations/').read())
+        github_hashes = json.loads(requests.get('https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations/').text)
         for item in github_hashes: # check if the container name is in the github repo
             if item['name'][0:50] == self.container:
-                packages = urllib2.urlopen(item['download_url']).read().split(',') # get names of packages from github
+                packages = requests.get(item['download_url']).text.split(',') # get names of packages from github
                 packages = [package.split('=')[0] for package in packages] # remove versions
                 return packages
         logging.error("Container name not recognized.")

@@ -26,13 +26,13 @@ QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 def get_quay_containers():
     """
     Gets all quay containers in the biocontainers repo
-    >>> lst = get_quay_containers()
-    >>> 'samtools:latest' in lst
-    True
-    >>> 'abricate:0.4--pl5.22.0_0' in lst
-    True
-    >>> 'samtools' in lst
-    False
+    # >>> lst = get_quay_containers()
+    # >>> 'samtools:latest' in lst
+    # True
+    # >>> 'abricate:0.4--pl5.22.0_0' in lst
+    # True
+    # >>> 'samtools' in lst
+    # False
     """
     containers = []
 
@@ -55,13 +55,13 @@ def get_quay_containers():
 def get_singularity_containers():
     """
     Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
-    >>> lst = get_singularity_containers()
-    >>> 'aragorn:1.2.36--1' in lst
-    True
-    >>> 'znc:latest' in lst
-    False
+    # >>> lst = get_singularity_containers()
+    # >>> 'aragorn:1.2.36--1' in lst
+    # True
+    # >>> 'znc:latest' in lst
+    # False
 
-    # """
+    """
     index_url = "https://depot.galaxyproject.org/singularity/"
     index = requests.get(index_url)
     #l = response.text.split('\n')
@@ -73,17 +73,17 @@ def get_singularity_containers():
 def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     """
     Returns list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
-    >>> lst = get_missing_containers()
-    >>> 'aragorn:1.2.36--1' in lst
-    False
-    >>> 'znc:latest' in lst
-    False
-    >>> 'pybigwig:0.1.11--py36_0' in lst
-    True
-    >>> 'samtools' in lst
-    False
-    >>> get_missing_containers(quay_list=[1, 2, 3, 'h', 'g', 'r'], singularity_list=[3, 4, 5], blacklist_file='blacklist.txt')
-    [1, 2, 'h']
+    # >>> lst = get_missing_containers()
+    # >>> 'aragorn:1.2.36--1' in lst
+    # False
+    # >>> 'znc:latest' in lst
+    # False
+    # >>> 'pybigwig:0.1.11--py36_0' in lst
+    # True
+    # >>> 'samtools' in lst
+    # False
+    # >>> get_missing_containers(quay_list=[1, 2, 3, 'h', 'g', 'r'], singularity_list=[3, 4, 5], blacklist_file='blacklist.txt')
+    # [1, 2, 'h']
 
     """
     blacklist = []
@@ -94,12 +94,12 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
 def docker_to_singularity(container):
     """
     Convert docker to singularity container
-    >>> from glob import glob
-    >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
-    []
-    >>> docker_to_singularity('abundancebin:1.0.1--0')
-    >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
-    ['summat/abundancebin:1.0.1--0']
+    # >>> from glob import glob
+    # >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
+    # []
+    # >>> docker_to_singularity('abundancebin:1.0.1--0')
+    # >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
+    # ['summat/abundancebin:1.0.1--0']
     """
 
     try:
@@ -114,12 +114,12 @@ def docker_to_singularity(container):
 def get_test(container):
     """
     Downloading tarball from anaconda for test
-    >>> get_test('abundancebin:1.0.1--0')
-    {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'import_lang': 'python -c', 'container': 'abundancebin:1.0.1--0'}
-    >>> get_test('snakemake:3.11.2--py34_1')
-    {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
-    >>> get_test('perl-yaml:1.15--pl5.22.0_0')
-    {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
+    # >>> get_test('abundancebin:1.0.1--0')
+    # {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'import_lang': 'python -c', 'container': 'abundancebin:1.0.1--0'}
+    # >>> get_test('snakemake:3.11.2--py34_1')
+    # {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
+    # >>> get_test('perl-yaml:1.15--pl5.22.0_0')
+    # {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
 
     """
     package_tests = {}
@@ -180,8 +180,8 @@ def get_test(container):
 def mulled_get_test(container):
     """
     Gets test for hashed containers
-    >>> print(mulled_get_test('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'))
-    {'commands': ['bamtools --help', 'samtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
+    # >>> print(mulled_get_test('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'))
+    # {'commands': ['bamtools --help', 'samtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
 
     """
 
@@ -220,10 +220,10 @@ def mulled_get_test(container):
 def test_singularity_container(tests):
     """
     Run tests, record if they pass or fail
-    >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'blat:35--1': {'commands': ['#!/bin/bash && set +e && blat > /dev/null 2>&1 && if [[ $? -eq 255 ]] && then && \texit 0 && else && \texit 1 && fi && ']}, 'blat:35--1': {'commands': ['#!/bin/bash && set +e && blat > /dev/null 2>&1 && if [[ $? -eq 255 ]] && then && \texit 0 && else && \texit 1 && fi && ']}, 'yasm:1.3.0--0': {}})
-    >>> 'blat:35--1' in results['passed']
+    >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}})
+    >>> 'samtools:1.6--0' in results['passed']
     True
-    >>> 'pybigwig:0.1.11--py36_0' in results['failed']
+    >>> results['failed'][0]['imports'] == ['pyBigWig']
     True
     >>> 'yasm:1.3.0--0' in results['notest']
     True
@@ -315,6 +315,6 @@ def main():
                 f.write('\n\t%s' % container)
 
 if __name__ == "__main__":
-    main()
-    # import doctest
-    # doctest.testmod()
+    #main()
+    import doctest
+    doctest.testmod()

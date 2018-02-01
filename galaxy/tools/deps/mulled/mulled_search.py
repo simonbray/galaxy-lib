@@ -122,7 +122,7 @@ class CondaSearch():
     
     >>> t.process_json(t.get_json("adsfasdf"), "adsfasdf")
     []
-    >>> {'version': u'2.2.0', 'build': u'0', 'package': u'bioconductor-gosemsim'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
+    >>> {'version': u'2.2.0', 'package': u'bioconductor-gosemsim'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
     True
     """
 
@@ -254,9 +254,10 @@ def get_package_hash(packages, versions):
 def singularity_search(search_string):
     """
     Checks if a singularity package is present and returns the link.
-    >>> singularity_search({'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'})
-    'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa%3Ac17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'
-    >>> singularity_search({'container_present': False, 'version_hash': 'cb5455068b161c76257d2e2bcffa58f54f920291', 'package_hash': 'mulled-v2-19fa9431f5863b2be81ff13791f1b00160ed0852'}) is None
+    >>> t = singularity_search('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa')
+    >>> t == [{'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'version': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'}, {'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'version': 'fc33176431a4b9ef3213640937e641d731db04f1-0'}]
+    True
+    >>> singularity_search('mulled-v2-19fa9431f5863b2be81ff13791f1b00160ed0852') == []
     True
     """
     results = []
@@ -375,7 +376,7 @@ def main(argv=None):
         readable_output(json_results)
 
 if __name__ == "__main__":
-    main()
+    # main()
 
-    #import doctest
-    #doctest.testmod()
+    import doctest
+    doctest.testmod()

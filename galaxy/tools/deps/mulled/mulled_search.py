@@ -278,37 +278,51 @@ def readable_output(json):
         sys.stdout.write('No results found for that query.\n')
         return
 
-    if sum([len(json[destination][results]) for destination in ['quay', 'conda', 'singularity'] for results in json.get(destination, [])]) > 0:
+    # return results for quay, conda and singularity together
+    if sum([len(json[destination][results]) for destination in ['quay', 'conda', 'singularity',] for results in json.get(destination, [])]) > 0:
         sys.stdout.write("The query returned the following result(s).\n")
         lines = [['LOCATION', 'NAME', 'VERSION', 'COMMAND\n']] # put quay, conda etc results as lists in lines
         for search_string, results in json.get('quay', {}).items():
             for result in results:
-                lines.append(['quay', result['package'], result['version'], 'quay.io/biocontainers/%s:%s\n' % (result['package'], result['version'])]) # NOT a real solution
+                lines.append(['quay', result['package'], result['version'], 'docker pull quay.io/biocontainers/%s:%s\n' % (result['package'], result['version'])]) # NOT a real solution
         for search_string, results in json.get('conda', {}).items():
             for result in results:
                 lines.append(['conda', result['package'], result['version'], 'conda install -c bioconda %s=%s\n' % (result['package'], result['version'])])
         for search_string, results in json.get('singularity', {}).items():
             for result in results:
                 lines.append(['singularity', result['package'], result['version'], 'wget https://depot.galaxyproject.org/singularity/%s:%s\n' % (result['package'], result['version'])])
-        
+
         col_width0, col_width1, col_width2 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1, 2)) # def max col widths for the output
 
+        #create table
         for line in lines:
             sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2].ljust(col_width2), line[3]))) #output
+
+    if json.get('github_recipe_present', False):
+        sys.stdout.write('\n' if 'lines' in locals() else '')
+        sys.stdout.write('The following recipes were found in the bioconda-recipes repository which exactly matched one of the search terms:\n')
+        lines = [['QUERY', 'LOCATION\n']]
+        for recipe in json['github_recipe_present']['recipes']:
+            lines.append([recipe, "https://api.github.com/repos/bioconda/bioconda-recipes/contents/recipes/%s\n" % recipe])
+
+        col_width0 = max(len(line[0]) for line in lines) + 2
+
+        for line in lines:
+            sys.stdout.write("".join((line[0].ljust(col_width0), line[1]))) #output
 
 
     if sum([len(json['github'][results]) for results in json.get('github', [])]) > 0:
         sys.stdout.write('\n' if 'lines' in locals() else '')
-        sys.stdout.write("Result(s) on the bioconda-recipes GitHub repository:\n")
+        sys.stdout.write("Other result(s) on the bioconda-recipes GitHub repository:\n")
         lines = [['QUERY', 'FILE', 'URL\n']]
         for search_string, results in json.get('github', {}).items():
             for result in results:
                 lines.append([search_string, result['name'], 'https://github.com/bioconda/bioconda-recipes/tree/master/%s\n' % result['path']])
 
-    col_width0, col_width1 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1)) # def max col widths for the output
+        col_width0, col_width1 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1)) # def max col widths for the output
 
-    for line in lines:
-        sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2]))) #output
+        for line in lines:
+            sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2]))) #output
 
 
 def main(argv=None):
@@ -346,12 +360,17 @@ def main(argv=None):
 
     if 'github' in args.search_dest:
         github_results = {}
+        github_recipe_present = []
         github = GitHubSearch()
 
         for item in args.search:
             github_json = github.get_json(item)
             github_results[item] = github.process_json(github_json, item)
+            if github.recipe_present(item):
+                github_recipe_present.append(item)
+        
         json_results['github'] = github_results
+        json_results['github_recipe_present'] = {'recipes': github_recipe_present}
 
 
     if 'quay' in args.search_dest:
@@ -376,7 +395,7 @@ def main(argv=None):
         readable_output(json_results)
 
 if __name__ == "__main__":
-    # main()
+    main()
 
-    import doctest
-    doctest.testmod()
+    # import doctest
+    # doctest.testmod()

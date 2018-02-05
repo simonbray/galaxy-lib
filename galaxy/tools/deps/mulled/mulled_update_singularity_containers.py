@@ -13,6 +13,7 @@ from shutil import copy
 import pickle
 import json
 import argparse
+from jinja2 import Template
 
 from glob import glob
 
@@ -120,8 +121,8 @@ def get_test(container):
     # {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
     # >>> get_test('perl-yaml:1.15--pl5.22.0_0')
     # {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
-
     """
+
     package_tests = {}
     name = container.replace('--', ':').split(':') # list consisting of [name, version, (build, if present)]
 
@@ -132,7 +133,13 @@ def get_test(container):
     except tarfile.ReadError:
         pass
     else:
-
+        # process jinja syntax
+        with open(file, 'r+') as f:
+            yaml = Template(f.read()).render()
+            f.seek(0)
+            f.write(yaml)
+            f.truncate()
+        
         try: # try to open meta.yam
             metafile = tarball.extractfile('info/recipe/meta.yaml')
             meta_yaml = yaml.load(metafile)

@@ -133,19 +133,13 @@ def get_test(container):
     except tarfile.ReadError:
         pass
     else:
-        # process jinja syntax
-        with open(file, 'r+') as f:
-            yaml = Template(f.read()).render()
-            f.seek(0)
-            f.write(yaml)
-            f.truncate()
-        
-        try: # try to open meta.yam
+        try: # try to open meta.yaml
             metafile = tarball.extractfile('info/recipe/meta.yaml')
-            meta_yaml = yaml.load(metafile)
+            
         except KeyError: # if it's not there ...
             logging.error("meta.yaml file not present.")
         else:
+            meta_yaml = yaml.load(Template(metafile.read().decode('utf-8')).render()) # run the file through the jinja processing
             try:
                 if meta_yaml['test']['commands'] != [None]:
                     package_tests['commands'] = meta_yaml['test']['commands']
@@ -322,6 +316,6 @@ def main():
                 f.write('\n\t%s' % container)
 
 if __name__ == "__main__":
-    #main()
-    import doctest
-    doctest.testmod()
+    main()
+    # import doctest
+    # doctest.testmod()

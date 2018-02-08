@@ -114,14 +114,16 @@ def main():
                         help="Provide a 'blacklist file' containing environments which should not be processed.")
     parser.add_argument('-o', '--logfile', dest='logfile', default='conda.log',
                         help="Filename for a log to be written to.")
+    
+    args = parser.parse_args()
 
     if not args.envs:
         envs = get_missing_envs(quay_list=get_quay_containers(), conda_list=get_conda_envs(), blacklist_file=args.blacklist)
     else:
-        envs = args.containers
+        envs = args.envs
 
     with open(args.logfile, 'w') as f:
-        f.write("SINGULARITY CONTAINERS GENERATED:")
+        f.write("CONDA ENVIRONMENTS GENERATED:")
 
         for env in envs:
             extract_env_from_container(env)
@@ -130,9 +132,9 @@ def main():
             tests = {}
             for env in envs:
                 if env[0:6] == 'mulled': # if it is a 'hashed container'
-                    tests['__%s' % env.replace(':', '@')] = mulled_get_test(env)
+                    tests['__%s' % env.split('--')[0].replace(':', '@')] = mulled_get_test(env)
                 else:
-                    tests[env] = get_test(env)
+                    tests['__%s' % env.split('--')[0].replace(':', '@')] = get_test(env)
                 
             test_results = test_conda_env(tests)
     
@@ -141,7 +143,7 @@ def main():
                 f.write('\n\t\t%s' % env)
             f.write('\n\tTEST FAILED:')
             for env in test_results['failed']:
-                f.write('\n\t\t%s' % env['env'])
+                f.write('\n\t\t%s' % env['container'])
                 for error in env['errors']:
                     f.write('\n\t\t\tCOMMAND: %s\n\t\t\t\tERROR:%s' % (error.get('command', 'import' + error.get('import', 'nothing found')), error['output']))                
             f.write('\n\tNO TEST AVAILABLE:')
@@ -152,7 +154,7 @@ def main():
                 f.write('\n\t%s' % env)
 
 if __name__ == '__main__':
-    #main()
+    main()
 
-    import doctest
-    doctest.testmod()
+    # import doctest
+    # doctest.testmod()

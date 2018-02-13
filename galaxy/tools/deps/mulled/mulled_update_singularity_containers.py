@@ -20,8 +20,7 @@ from glob import glob
 yaml = YAML()
 yaml.allow_duplicate_keys = True
 
-SINGULARITY_DESTINATION = "/data/0/cvmfs/singularity" # file destination for singularity containers
-SINGULARITY_INSTALL = "/opt/singularity/bin/singularity" # location at which singularity is installed, could be something else like /usr/local/bin/singularity
+#installation = "/opt/singularity/bin/singularity" # location at which singularity is installed, could be something else like /usr/local/bin/singularity
 QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 
 def get_quay_containers():
@@ -92,19 +91,19 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
         blacklist = open(blacklist_file).read().split('\n')
     return [n for n in quay_list if n not in singularity_list and n not in blacklist]
 
-def docker_to_singularity(container):
+def docker_to_singularity(container, installation, filepath):
     """
     Convert docker to singularity container
     # >>> from glob import glob
-    # >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
+    # >>> glob('%s/abundancebin:1.0.1--0' % filepath)
     # []
     # >>> docker_to_singularity('abundancebin:1.0.1--0')
-    # >>> glob('%s/abundancebin:1.0.1--0' % SINGULARITY_DESTINATION)
+    # >>> glob('%s/abundancebin:1.0.1--0' % filepath)
     # ['summat/abundancebin:1.0.1--0']
     """
 
     try:
-        check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, container), stderr=subprocess.STDOUT, shell=True)
+        check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" % (installation, filepath, container, container), stderr=subprocess.STDOUT, shell=True)
     except subprocess.CalledProcessError as e:
         error_info = {'code': e.returncode, 'cmd': e.cmd, 'out': e.output}
         return error_info
@@ -218,7 +217,7 @@ def mulled_get_test(container):
 
     return package_tests
 
-def test_singularity_container(tests):
+def test_singularity_container(tests, installation, filepath):
     """
     Run tests, record if they pass or fail
     >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}})
@@ -244,10 +243,10 @@ def test_singularity_container(tests):
                     command = command.replace('$R ', 'Rscript ')
                     
                     try:
-                        check_output("%s exec -H /tmp/foo %s/%s bash -c \"%s\"" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, command), stderr=subprocess.STDOUT, shell=True)
+                        check_output("%s exec -H /tmp/foo %s/%s bash -c \"%s\"" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e1:
                         try:
-                            check_output("%s exec -H /tmp/foo %s/%s %s" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, command), stderr=subprocess.STDOUT, shell=True)
+                            check_output("%s exec -H /tmp/foo %s/%s %s" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
                         except subprocess.CalledProcessError as e2:
                             errors.append({'command': command, 'output': e2.output})
                             test_passed = False
@@ -255,7 +254,7 @@ def test_singularity_container(tests):
             if test.get('imports', False):
                 for imp in test['imports']:
                     try:
-                        check_output("%s exec -H /tmp/foo %s/%s %s 'import %s'" % (SINGULARITY_INSTALL, SINGULARITY_DESTINATION, container, test['import_lang'], imp), stderr=subprocess.STDOUT, shell=True)
+                        check_output("%s exec -H /tmp/foo %s/%s %s 'import %s'" % (installation, filepath, container, test['import_lang'], imp), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e:
                         errors.append({'import': imp, 'output': e.output})
                         test_passed = False
@@ -278,6 +277,12 @@ def main():
                         help="Provide a 'blacklist file' containing containers which should not be processed.")
     parser.add_argument('-o', '--logfile', dest='logfile', default='singularity.log',
                         help="Filename for a log to be written to.")
+    parser.add_argument('-f', '--filepath', dest='filepath',
+                        help="File path where Singularity containers are stored.")
+    parser.add_argument('-i', '--installation', dest='installation',
+                        help="File path of Singularity installation.")
+
+
     args = parser.parse_args()
 
     if not args.containers:
@@ -289,7 +294,7 @@ def main():
         f.write("SINGULARITY CONTAINERS GENERATED:")
 
         for container in containers:
-            docker_to_singularity(container)
+            docker_to_singularity(container, args.installation, args.filepath)
 
         if not args.no_testing:
             tests = {}
@@ -298,7 +303,7 @@ def main():
                     tests[container] = mulled_get_test(container)
                 else:
                     tests[container] = get_test(container)
-            test_results = test_singularity_container(tests)
+            test_results = test_singularity_container(tests, args.installation, args.filepath)
     
             f.write('\n\tTEST PASSED:')
             for container in test_results['passed']:
@@ -316,6 +321,6 @@ def main():
                 f.write('\n\t%s' % container)
 
 if __name__ == "__main__":
-    main()
-    # import doctest
-    # doctest.testmod()
+    # main()
+    import doctest
+    doctest.testmod()

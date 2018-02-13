@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-# searches for tests for packages in the bioconda-recipes repo as well as on Anaconda, looking in different file locations. If no test can be found for the specified version, it will look for tests for other versions of the same package.
+"""
+searches for tests for packages in the bioconda-recipes repo as well as on Anaconda, looking in different file locations. If no test can be found for the specified version, it will look for tests for other versions of the same package.
+"""
 
 from glob import glob
 from ruamel.yaml import YAML

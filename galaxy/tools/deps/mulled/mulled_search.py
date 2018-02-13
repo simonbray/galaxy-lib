@@ -118,7 +118,7 @@ class CondaSearch():
     Tool to search the bioconda channel
 
 
-    >>> t = CondaSearch()
+    >>> t = CondaSearch('bioconda')
     
     >>> t.process_json(t.get_json("adsfasdf"), "adsfasdf")
     []
@@ -126,13 +126,16 @@ class CondaSearch():
     True
     """
 
+    def __init__(self, channel):
+        self.channel = channel
+
     def get_json(self, search_string):
         """
         Function takes search_string variable and returns results from the bioconda channel in JSON format 
 
         """
         conda_api.set_root_prefix()
-        json_output = conda_api.search(search_string, channel='bioconda')
+        json_output = conda_api.search(search_string, channel=self.channel)
 
         return json_output
 
@@ -335,6 +338,8 @@ def main(argv=None):
                         help="Choose where to search. Options are 'conda', 'quay', 'singularity' and 'github'. If no option are given, all will be searched.")
     parser.add_argument('-o', '--organization', dest='organization_string', default="biocontainers",
                         help='Change quay organization to search; default is biocontainers.')
+    parser.add_argument('-c', '--channel', dest='channel_string', default="bioconda",
+                        help='Change conda channel to search; default is bioconda.')
     parser.add_argument('--non-strict', dest='non_strict', action="store_true",
                         help='Autocorrection of typos activated. Lists more results but can be confusing.\
                         For too many queries quay.io blocks the request and the results can be incomplete.')
@@ -351,7 +356,7 @@ def main(argv=None):
 
     if 'conda' in args.search_dest:
         conda_results = {}
-        conda = CondaSearch()
+        conda = CondaSearch(args.channel_string)
 
         for item in args.search:
             conda_json = conda.get_json(item)
@@ -395,7 +400,7 @@ def main(argv=None):
         readable_output(json_results)
 
 if __name__ == "__main__":
-    main()
+    # main()
 
-    # import doctest
-    # doctest.testmod()
+    import doctest
+    doctest.testmod()

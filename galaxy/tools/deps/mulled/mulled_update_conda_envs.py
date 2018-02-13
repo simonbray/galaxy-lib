@@ -7,9 +7,7 @@ import logging
 from glob import glob
 import argparse
 
-ENVIRONMENT_LOCATION = "/home/ubuntu/condaenvs"
-
-def get_conda_envs():
+def get_conda_envs(filepath):
     """
     Gets list of already existing envs
     # >>> t = get_conda_envs()
@@ -17,7 +15,7 @@ def get_conda_envs():
     True
     """
 
-    return [n.split('__')[-1].replace('@', ':') for n in glob('%s/*' % ENVIRONMENT_LOCATION)]
+    return [n.split('__')[-1].replace('@', ':') for n in glob('%s/*' % filepath)]
 
 def get_missing_envs(quay_list, conda_list, blacklist_file=None):
     """
@@ -32,20 +30,20 @@ def get_missing_envs(quay_list, conda_list, blacklist_file=None):
     return [n for n in quay_list if n.split('--')[0] not in conda_list and n.split('--')[0] not in blacklist]
 
 
-def extract_env_from_container(container): #container as name:build--version
+def extract_env_from_container(container, filepath): #container as name:build--version
     """
     Convert docker to singularity container
     # >>> from glob import glob
-    # >>> glob('%s/__abundancebin@1.0.1--0' % ENVIRONMENT_LOCATION)
+    # >>> glob('%s/__abundancebin@1.0.1--0' % filepath)
     # []
     # >>> extract_env_from_container('abundancebin:1.0.1--0')
-    # >>> glob('%s/__abundancebin@1.0.1' % ENVIRONMENT_LOCATION)
+    # >>> glob('%s/__abundancebin@1.0.1' % filepath)
     # ['/home/ubuntu/condaenvs/__abundancebin@1.0.1']
     """
 
     envname = '__%s' % '@'.join(container.split('--')[0].split(':'))
     try:
-        check_output("cid=`docker run -d quay.io/biocontainers/%s` && sudo docker cp $cid:/usr/local/ %s/%s && docker stop $cid && docker rm $(docker ps -a -q) && docker rmi $(docker images -q)" % (container, ENVIRONMENT_LOCATION, envname), shell=True)
+        check_output("cid=`docker run -d quay.io/biocontainers/%s` && sudo docker cp $cid:/usr/local/ %s/%s && docker stop $cid && docker rm $(docker ps -a -q) && docker rmi $(docker images -q)" % (container, filepath, envname), shell=True)
     except subprocess.CalledProcessError as e:
         error_info = {'code': e.returncode, 'cmd': e.cmd, 'out': e.output, 'container': container}
         return error_info
@@ -108,6 +106,8 @@ def main():
     parser = argparse.ArgumentParser(description='Updates index of conda environments.')
     parser.add_argument('-e', '--environments', dest='envs', nargs='+', default=None,
                         help="Environments to be generated. If not given, all new additions to the quay biocontainers repository will be generated.")
+    parser.add_argument('-f', '--filepath', dest='filepath',
+                        help="File path where conda environments are stored.")
     parser.add_argument('-nt', '--no-testing', dest='no_testing', action="store_true",
                         help="Skip testing of generated environments (not recommended).")
     parser.add_argument('-b', '--blacklist', dest='blacklist', default=None, 
@@ -118,7 +118,7 @@ def main():
     args = parser.parse_args()
 
     if not args.envs:
-        envs = get_missing_envs(quay_list=get_quay_containers(), conda_list=get_conda_envs(), blacklist_file=args.blacklist)
+        envs = get_missing_envs(quay_list=get_quay_containers(), conda_list=get_conda_envs(args.filepath), blacklist_file=args.blacklist)
     else:
         envs = args.envs
 
@@ -126,7 +126,7 @@ def main():
         f.write("CONDA ENVIRONMENTS GENERATED:")
 
         for env in envs:
-            extract_env_from_container(env)
+            extract_env_from_container(env, args.filepath)
 
         if not args.no_testing:
             tests = {}

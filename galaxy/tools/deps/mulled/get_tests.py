@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 """
-searches for tests for packages in the bioconda-recipes repo as well as on Anaconda, looking in different file locations. If no test can be found for the specified version, it will look for tests for other versions of the same package.
+searches for tests for packages in the bioconda-recipes repo and on Anaconda, looking in different file locations. If no test can be found for the specified version, it will look for tests for other versions of the same package.
+
+A shallow search (default for singularity and conda generation scripts) just checks once on Anaconda for the specified version.
 """
 
 from glob import glob
@@ -13,17 +15,20 @@ from ruamel.yaml.scanner import ScannerError
 yaml = YAML()
 yaml.allow_duplicate_keys = True
 import logging
-from  jinja2 import Template
+from jinja2 import Template
 import json
+from util import split_container_name
 
 def get_commands_from_yaml(file):
     """
     Gets tests from a yaml file
+    >>> get_commands_from_yaml('{% set name = "eagle" %}\\n\\npackage:\\n  name: \\'{{ name }}\\'\\n\\nrequirements:\\n  run:\\n    - python\\n    - flask\\n\\ntest:\\n  imports:\\n    - eagle\\n  commands:\\n    - eagle --help')
+    {'imports': ['eagle'], 'commands': ['eagle --help'], 'import_lang': 'python -c'}
     """
     package_tests = {}
 
     try:
-        meta_yaml = yaml.load(Template(file.read().decode('utf-8')).render()) # run the file through the jinja processing
+        meta_yaml = yaml.load(Template(file.decode('utf-8')).render()) # run the file through the jinja processing
     except ScannerError: # should not occur due to the above
         logging.info('ScannerError')
         return None
@@ -61,23 +66,33 @@ def get_commands_from_yaml(file):
     return package_tests
     
 
-def get_runtest(file):
+def get_run_test(file):
     """
     Gets tests from a run_test.sh file
-
+    >>> get_run_test('#!/bin/bash\\npslScore 2> /dev/null || [[ "$?" == 255 ]]')
+    {'commands': ['#!/bin/bash && pslScore 2> /dev/null || [[ "$?" == 255 ]]']}
     """
     package_tests = {}
-    package_tests['commands'] = [file.read().replace('\n', ' && ')]
+    package_tests['commands'] = [file.replace('\n', ' && ')]
     return package_tests
 
 
-def get_anaconda_url(container):
+def get_anaconda_url(container, anaconda_channel='bioconda'):
     """
     Downloading tarball from anaconda for test
+    >>> get_anaconda_url('samtools:1.7--1')
+    'https://anaconda.org/bioconda/samtools/1.7/download/linux-64/samtools-1.7-1.tar.bz2'
     """
-    name = container.replace('--', ':').split(':') # list consisting of [name, version, (build, if present)]
-    return "https://anaconda.org/bioconda/%s/%s/download/linux-64/%s.tar.bz2" % (name[0], name[1], '-'.join(name))
+    name = split_container_name(container) # list consisting of [name, version, (build, if present)]
+    return "https://anaconda.org/%s/%s/%s/download/linux-64/%s.tar.bz2" % (anaconda_channel, name[0], name[1], '-'.join(name))
 
+def prepend_anaconda_url(url):
+    """
+    Takes a partial url and prepends 'https://anaconda.org'
+    >>> prepend_anaconda_url('/bioconda/samtools/0.1.12/download/linux-64/samtools-0.1.12-2.tar.bz2')
+    'https://anaconda.org/bioconda/samtools/0.1.12/download/linux-64/samtools-0.1.12-2.tar.bz2'
+    """
+    return 'https://anaconda.org%s' % url
 
 def get_test_from_anaconda(url):
     """
@@ -97,169 +112,185 @@ def get_test_from_anaconda(url):
     except (tarfile.ReadError, KeyError, TypeError):
         pass
     else:
-        package_tests = get_commands_from_yaml(metafile)
+        package_tests = get_commands_from_yaml(metafile.read())
         if package_tests:
             return package_tests
 
-    # this part is probably unnecessary, but some of the older tarballs have a testfile with .yaml.template ext
-    # try:
-    #     metafile = tarball.extractfile('info/recipe/meta.yaml.template')
-    # except (tarfile.ReadError, KeyError, TypeError):
-    #     pass
-    # else:
-    #     package_tests = get_commands_from_yaml(metafile)
-    #     if package_tests: 
-    #         return package_tests
+    # this part is perhaps unnecessary, but some of the older tarballs have a testfile with .yaml.template ext
+    try:
+        metafile = tarball.extractfile('info/recipe/meta.yaml.template')
+    except (tarfile.ReadError, KeyError, TypeError):
+        pass
+    else:
+        package_tests = get_commands_from_yaml(metafile)
+        if package_tests: 
+            return package_tests
 
     # if meta.yaml was not present or there were no tests in it, try and get run_test.sh instead
     try: 
         run_test = tarball.extractfile('info/recipe/run_test.sh')
-        return get_runtest(run_test)
+        return get_run_test(run_test)
     except KeyError:
         return None
         logging.info("run_test.sh file not present.")
 
 
-def find_anaconda_versions(name):
-    r = requests.get("https://anaconda.org/bioconda/%s/files" % name)
+def find_anaconda_versions(name, anaconda_channel='bioconda'):
+    """
+    Finds a list of available anaconda versions for a given container name
+    >>> find_anaconda_versions('2pg_cartesian')
+    [u'/bioconda/2pg_cartesian/1.0.1/download/linux-64/2pg_cartesian-1.0.1-0.tar.bz2']
+    """
+    r = requests.get("https://anaconda.org/%s/%s/files" % (anaconda_channel, name))
     urls = []
     for line in r.text.split('\n'):
         if 'download/linux' in line:
             urls.append(line.split('"')[1])
     return urls
 
-def open_recipe_file(file):
-	if RECIPES_REPO_PATH:
-		return open('%s/%s' % (RECIPES_REPO_PATH, file))
-	else: # if no clone of the repo is available locally, download from GitHub
-		r = requests.get('https://raw.githubusercontent.com/bioconda/bioconda-recipes/master/%s' % recipes)
-		if r.status_code == 404:
-			raise IOError
-		else:
-			return r.text
+def open_recipe_file(file, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
+    """
+    Opens a file at a particular location and returns contents as string
+    >>> open_recipe_file('recipes/samtools/1.0/meta.yaml')
+    u'about:\\n  home: https://github.com/samtools/samtools\\n  license: MIT\\n  summary: Tools for dealing with SAM, BAM and CRAM files\\n\\nbuild:\\n  number: 1\\n\\npackage:\\n  name: samtools\\n  version: \\'1.0\\'\\n\\nrequirements:\\n  build:\\n  - ncurses {{CONDA_NCURSES}}*\\n  - zlib {{CONDA_ZLIB}}*\\n  run:\\n  - ncurses {{CONDA_NCURSES}}*\\n  - zlib {{CONDA_ZLIB}}*\\n\\nsource:\\n  fn: samtools-1.0.tar.bz2\\n  sha256: 7340b843663c3f54a902a06f2f73c68198f3a62d29a2ed20671139957f7fd7c0\\n  url: http://downloads.sourceforge.net/project/samtools/samtools/1.0/samtools-1.0.tar.bz2\\n\\ntest:\\n  commands:\\n    - "samtools view --help 2>&1 | grep Notes > /dev/null"\\n'
+    """
+    if recipes_path:
+        return open('%s/%s' % (recipes_path, file)).read()
+    else: # if no clone of the repo is available locally, download from GitHub
+        r = requests.get('https://raw.githubusercontent.com/%s/master/%s' % (github_repo, file))
+        if r.status_code == 404:
+            raise IOError
+        else:
+            return r.text
 
-def get_alternative_versions(filepath, filename):
-	"""
-	Returns files that match 'filepath/*/filename' in the bioconda-recipes repository
-	>>> get_alternative_versions('recipes/samtools', 'meta.yaml')
-	['recipes/samtools/0.1.12/meta.yaml', 'recipes/samtools/0.1.16/meta.yaml', 'recipes/samtools/0.1.17/meta.yaml', 'recipes/samtools/0.1.14/meta.yaml', 'recipes/samtools/0.1.13/meta.yaml', 'recipes/samtools/0.1.15/meta.yaml', 'recipes/samtools/0.1.19/meta.yaml', 'recipes/samtools/1.0/meta.yaml', 'recipes/samtools/0.1.18/meta.yaml', 'recipes/samtools/1.1/meta.yaml']
+def get_alternative_versions(filepath, filename, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
+    """
+    Returns files that match 'filepath/*/filename' in the bioconda-recipes repository
+    >>> s = get_alternative_versions('recipes/samtools', 'meta.yaml')
+    >>> len(s)
+    10
+    >>> 'recipes/samtools/0.1.19/meta.yaml' in s
+    True
+    >>> t = get_alternative_versions('recipes/samtools', 'meta.yaml', recipes_path='/home/simon/GitRepos/bioconda-recipes')
+    >>> len(t)
+    10
+    >>> 'recipes/samtools/0.1.19/meta.yaml' in t
+    True
+    """
+    if recipes_path:
+        return [n.replace('%s/' % recipes_path, '') for n in glob('%s/%s/*/%s' % (recipes_path, filepath, filename))]
+    # else use the GitHub API:
+    versions = []
+    r = json.loads(requests.get('https://api.github.com/repos/%s/contents/%s' % (github_repo, filepath)).content)
+    for subfile in r:
+        if subfile['type'] == 'dir':
+            if requests.get('https://raw.githubusercontent.com/%s/master/%s/%s' % (github_repo, subfile['path'], filename)).status_code == 200:
+                versions.append('%s/%s' % (subfile['path'], filename))
+    return versions
 
-	"""
-	if RECIPES_REPO_PATH:
-		return [n.replace('%s/' % RECIPES_REPO_PATH, '') for n in glob('%s/%s/*/%s' % (RECIPES_REPO_PATH, filepath, filename))]
-	# else use the GitHub API:
-	versions = []
-	r = json.loads(requests.get('https://api.github.com/repos/bioconda/bioconda-recipes/contents/%s' % filepath).content)
-	for subfile in r:
-		if subfile['type'] == 'dir':
-			if requests.get('https://raw.githubusercontent.com/bioconda/bioconda-recipes/master/%s/%s' % (subfile['path'], filename)).status_code == 200:
-				versions.append('%s/%s' % (subfile['path'], filename))
-	return versions
-
-
-def get_test(container):
-    name = container.replace('--', ':').split(':')
-
-    # first try meta.yaml in correct version folder
-
+def try_a_func(func1, func2, param, container):
+    """
+    Tries to perform a function (or actually a combination of two functions: first getting the file and then processing it)
+    """
     try:
-        t = get_commands_from_yaml(open_recipe_file('recipes/%s/%s/meta.yaml' % (name[0], name[1])))
-    except IOError: 
-        logging.info('/home/ubuntu/GitRepos/bioconda-recipes/recipes/%s/%s/meta.yaml could not be opened.' % (name[0], name[1]))
-        t = None
-    if t:
-        t['container'] == container
-        return t
+        result = func1(func2(*param))
+    except IOError:
+        return None
+    if result:
+        result['container'] = container
+        return result
 
-    # try run_test in base folder
+def deep_test_search(container, recipes_path=None, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
+    """
+    Deep search looks in bioconda-recipes repo as well as anaconda for the tests, checking in multiple possible locations. If no test is found for the specified version it also searches if other package versions have a test available.
+    """
+    name = split_container_name(container)
+    for f in [
+                (get_commands_from_yaml, open_recipe_file, ('recipes/%s/%s/meta.yaml' % (name[0], name[1]), recipes_path, github_repo), container),
+                (get_run_test, open_recipe_file, ('recipes/%s/%s/run_test.sh' % (name[0], name[1]), recipes_path, github_repo), container),
+                (get_commands_from_yaml, open_recipe_file, ('recipes/%s/meta.yaml' % name[0], recipes_path, github_repo), container),
+                (get_run_test, open_recipe_file, ('recipes/%s/run_test.sh' % name[0], recipes_path, github_repo), container),
+                (get_test_from_anaconda, get_anaconda_url, (container, anaconda_channel), container),
+            ]:
+        result = try_a_func(*f)
+        if result:
+            return result
+        
+    versions = get_alternative_versions('recipes/%s' % name[0], 'meta.yaml', recipes_path, github_repo)
+    for version in versions:
+        result = try_a_func(get_commands_from_yaml, open_recipe_file, (version, recipes_path, github_repo), container)
+        if result:
+            return result
 
-    try:
-        t = get_runtest(open_recipe_file('recipes/%s/%s/run_test.sh' % (name[0], name[1])))
-    except IOError: 
-        logging.info('/home/ubuntu/GitRepos/bioconda-recipes/recipes/%s/%s/run_test.sh could not be opened.' % (name[0], name[1]))
-        t = None
-    if t:
-        t['container'] == container
-        return t
+    versions = get_alternative_versions('recipes/%s' % name[0], 'run_test.sh', recipes_path, github_repo)
+    for version in versions:
+        result = try_a_func(get_run_test, open_recipe_file, (version, recipes_path, github_repo), container)
+        if result:
+            return result
 
-    # now try meta.yaml in base folder
-    try:
-        t = get_commands_from_yaml(open_recipe_file('recipes/%s/meta.yaml' % name[0]))
-    except IOError: 
-        logging.info('/home/ubuntu/GitRepos/bioconda-recipes/recipes/%s/meta.yaml could not be opened.' % name[0])
-        t = None
-    if t:
-        t['container'] == container
-        return t
+    versions = find_anaconda_versions(name[0], anaconda_channel)
+    for version in versions:
+        result = try_a_func(get_test_from_anaconda, prepend_anaconda_url, (version,), container)
+        if result:
+            return result
+        
+    # if everything fails
+    return {'container': container}
 
-    # try run_test in base folder
+def test_search(container, recipes_path=None, deep=False, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
+    """
+    Downloading tarball from anaconda for test
+    >>> test_search('abundancebin:1.0.1--0') == {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'import_lang': 'python -c', 'container': 'abundancebin:1.0.1--0'}
+    True
+    >>> test_search('snakemake:3.11.2--py34_1') == {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
+    True
+    >>> test_search('perl-yaml:1.15--pl5.22.0_0') == {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
+    True
+    """
+    if deep: # do a deep search
+        return deep_test_search(container, recipes_path, anaconda_channel, github_repo)
+    # else shallow
+    result = try_a_func(get_test_from_anaconda, get_anaconda_url, (container, anaconda_channel), container)
+    if result:
+        return result
+    return {'container': container}
 
-    try:
-        t = get_runtest(open_recipe_file('recipes/%s/run_test.sh' % name[0]))
-    except IOError: 
-        logging.info('/home/ubuntu/GitRepos/bioconda-recipes/recipes/%s/run_test.sh could not be opened.' % name[0])
-        t = None
-    if t:
-        t['container'] == container
-        return t
+def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
+    """
+    Gets test for hashed containers
+    >>> t = hashed_test_search('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0')
+    >>> t == {'commands': ['bamtools --help', 'samtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
+    True
+    """
+    package_tests = {'commands': [], 'imports': [], 'container': container, 'import_lang': 'python -c'}
 
-    # try from anaconda
+    github_hashes = json.loads(requests.get('https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations/').text)
+    packages = []
+    for item in github_hashes: # check if the container name is in the github repo
+        if item['name'].split('.')[0] == container: # remove .tsv file ext before comparing name
+            packages = requests.get(item['download_url']).text.split(',') # get names of packages from github
+            packages = [package.split('=') for package in packages]
 
-    t = get_test_from_anaconda(get_anaconda_url(container))
-    if t:
-        t['container'] == container
-        return t
-    logging.info('Nothing on anaconda.')
-    # now try in incorrect version folders
+    containers = []
+    for package in packages:
+        r = requests.get("https://anaconda.org/bioconda/%s/files" % package[0])
+        p = '-'.join(package)
+        for line in r.text.split('\n'):
+            if p in line:
+                build = line.split(p)[1].split('.tar.bz2')[0]
+                if build == "":
+                    containers.append('%s:%s' % (package[0], package[1]))
+                else:
+                    containers.append('%s:%s-%s' % (package[0], package[1], build))
+                break
+    
+    for container in containers:
+        tests = test_search(container, recipes_path, deep, anaconda_channel, github_repo)
+        package_tests['commands'] += tests.get('commands', [])
+        for imp in tests.get('imports', []): # not a very nice solution but probably the simplest
+            package_tests['imports'].append("%s 'import %s'" % (tests['import_lang'], imp)) 
 
-    #g = glob('/home/ubuntu/GitRepos/bioconda-recipes/recipes/%s/*/meta.yaml' % container)
-    g = get_alternative_versions('recipes/%s' % container, 'meta.yaml')
-    for n in g:
-        try:
-            t = get_commands_from_yaml(open(n))
-        except IOError:
-            logging.info('No wrong versions (meta.yaml) either in recipes repo.')
-            t = None
-        if t:
-            t['container'] == container
-            return t
-
-    # g = glob('/home/ubuntu/GitRepos/bioconda-recipes/recipes/%s/*/run_test.sh')
-    g = get_alternative_versions('recipes/%s' % container, 'run_test.sh')
-    for n in g:
-        try:
-            t = get_commands_from_yaml(open(n))
-        except IOError:
-            logging.info('No wrong versions (run_test.sh) either in recipes repo.')
-            t = None
-        if t:
-            t['container'] == container
-            return t
-
-    g = find_anaconda_versions(container)
-    for n in g:
-        t = get_test_from_anaconda(n)
-        if t:
-            t['container'] == container
-            return t
-    logging.info('And no wrong versions in anaconda.')
-            
-    return {}
-
-######################################
-########## MAIN STARTS HERE ##########
-######################################
-
-RECIPES_REPO_PATH = '/home/simon/GitRepos/bioconda-recipes' # can also be None; then the the repository will be accessed via github
-
-# tests = {}
-# for n in ls:
-#     print(n)
-#     tests[n] = get_test(n)
-#     print(tests[n])
-
-# print(tests)
-
+    return package_tests
 
 import doctest
 doctest.testmod()

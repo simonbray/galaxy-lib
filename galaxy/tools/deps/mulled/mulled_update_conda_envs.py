@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from mulled_update_singularity_containers import get_quay_containers, get_test, mulled_get_test
+from mulled_update_singularity_containers import get_quay_containers
+from get_tests import test_search, hashed_test_search
 import subprocess
 #from mulled_build import check_output
 from subprocess import check_output
@@ -12,15 +13,19 @@ def get_conda_envs(filepath):
     Gets list of already existing envs
     # >>> t = get_conda_envs()
     # >>> 'samtools:latest' in t
-    True
+    # True
     """
 
     return [n.split('__')[-1].replace('@', ':') for n in glob('%s/*' % filepath)]
 
 def get_missing_envs(quay_list, conda_list, blacklist_file=None):
     """
-    # >>> get_missing_envs(quay_list=['1', '2', '3', 'h--1', 'g--2', 'r'], conda_list=['3', '4', '5'], blacklist_file='blacklisttest.txt')
-    # ['1', '2', 'h--1']
+    >>> import tempfile
+    >>> blacklist = tempfile.NamedTemporaryFile(delete=False)
+    >>> blacklist.write('l\\n\\ng\\nn\\nr')
+    >>> blacklist.close()
+    >>> get_missing_envs(quay_list=['1', '2', '3', 'h--1', 'g--2', 'r'], conda_list=['3', '4', '5'], blacklist_file=blacklist.name)
+    ['1', '2', 'h--1']
     """
     list_to_return = []
     blacklist = []
@@ -52,14 +57,14 @@ def extract_env_from_container(container, filepath): #container as name:build--v
 
 def test_conda_env(tests):
     """
-    Run tests, record if they pass or fail
-    >>> results = test_conda_env({'__samtools@latest': {'commands': ['samtools --help'], 'import_lang': 'python -c'}, '__pybigwig@0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, '__yasm@1.3.0--0': {}})
-    >>> 'pyBigWig' in results['failed'][0]['imports']
-    True
-    >>> '__samtools@latest' in results['passed']
-    True
-    >>> '__yasm@1.3.0--0' in results['notest']
-    True
+    # Run tests, record if they pass or fail
+    # >>> results = test_conda_env({'__samtools@latest': {'commands': ['samtools --help'], 'import_lang': 'python -c'}, '__pybigwig@0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, '__yasm@1.3.0--0': {}})
+    # >>> 'pyBigWig' in results['failed'][0]['imports']
+    # True
+    # >>> '__samtools@latest' in results['passed']
+    # True
+    # >>> '__yasm@1.3.0--0' in results['notest']
+    # True
 
     """
     test_results = {'passed': [], 'failed': [], 'notest': []}
@@ -114,7 +119,15 @@ def main():
                         help="Provide a 'blacklist file' containing environments which should not be processed.")
     parser.add_argument('-o', '--logfile', dest='logfile', default='conda.log',
                         help="Filename for a log to be written to.")
-    
+    parser.add_argument('--deep-search', dest='deep_search', default=False,
+                        help="Perform a more extensive, but probably slower, search for tests.")
+    parser.add_argument('--anaconda-channel', dest='anaconda_channel', default='bioconda',
+                        help="Anaconda channel to search for tests (default: bioconda).")
+    parser.add_argument('--github-repo', dest='github_repo',
+                        help="Github repository to search for tests - only relevant if --deep-search is activated (default: bioconda/bioconda-recipes")
+    parser.add_argument('--github-local-path', dest='github_local_path', default=None,
+                        help="If the bioconda-recipes repository (or other repository containing tests) is available locally, provide the path here. Only relevant if --deep-search is activated.")
+
     args = parser.parse_args()
 
     if not args.envs:
@@ -132,9 +145,9 @@ def main():
             tests = {}
             for env in envs:
                 if env[0:6] == 'mulled': # if it is a 'hashed container'
-                    tests['__%s' % env.split('--')[0].replace(':', '@')] = mulled_get_test(env)
+                    tests['__%s' % env.split('--')[0].replace(':', '@')] = hashed_test_search(env, args.github_local_path, args.deep_search, args.anaconda_channel, args.github_repo)
                 else:
-                    tests['__%s' % env.split('--')[0].replace(':', '@')] = get_test(env)
+                    tests['__%s' % env.split('--')[0].replace(':', '@')] = test_search(env, args.github_local_path, args.deep_search, args.anaconda_channel, args.github_repo)
                 
             test_results = test_conda_env(tests)
     
@@ -154,7 +167,7 @@ def main():
                 f.write('\n\t%s' % env)
 
 if __name__ == '__main__':
-    main()
+    #main()
 
-    # import doctest
-    # doctest.testmod()
+    import doctest
+    doctest.testmod()

@@ -14,7 +14,7 @@ import pickle
 import json
 import argparse
 from jinja2 import Template
-
+from get_tests import test_search, hashed_test_search
 from glob import glob
 
 yaml = YAML()
@@ -26,13 +26,13 @@ QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 def get_quay_containers():
     """
     Gets all quay containers in the biocontainers repo
-    # >>> lst = get_quay_containers()
-    # >>> 'samtools:latest' in lst
-    # True
-    # >>> 'abricate:0.4--pl5.22.0_0' in lst
-    # True
-    # >>> 'samtools' in lst
-    # False
+    >>> lst = get_quay_containers()
+    >>> 'samtools:latest' in lst
+    True
+    >>> 'abricate:0.4--pl5.22.0_0' in lst
+    True
+    >>> 'samtools' in lst
+    False
     """
     containers = []
 
@@ -55,11 +55,11 @@ def get_quay_containers():
 def get_singularity_containers():
     """
     Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
-    # >>> lst = get_singularity_containers()
-    # >>> 'aragorn:1.2.36--1' in lst
-    # True
-    # >>> 'znc:latest' in lst
-    # False
+    >>> lst = get_singularity_containers()
+    >>> 'aragorn:1.2.36--1' in lst
+    True
+    >>> 'znc:latest' in lst
+    False
 
     """
     index_url = "https://depot.galaxyproject.org/singularity/"
@@ -73,18 +73,13 @@ def get_singularity_containers():
 def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     """
     Returns list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
-    # >>> lst = get_missing_containers()
-    # >>> 'aragorn:1.2.36--1' in lst
-    # False
-    # >>> 'znc:latest' in lst
-    # False
-    # >>> 'pybigwig:0.1.11--py36_0' in lst
-    # True
-    # >>> 'samtools' in lst
-    # False
-    # >>> get_missing_containers(quay_list=[1, 2, 3, 'h', 'g', 'r'], singularity_list=[3, 4, 5], blacklist_file='blacklist.txt')
-    # [1, 2, 'h']
 
+    >>> import tempfile
+    >>> blacklist = tempfile.NamedTemporaryFile(delete=False)
+    >>> blacklist.write('l\\n\\ng\\nn\\nr')
+    >>> blacklist.close()
+    >>> get_missing_containers(quay_list=['1', '2', '3', 'h', 'g', 'r'], singularity_list=['3', '4', '5'], blacklist_file=blacklist.name)
+    ['1', '2', 'h']
     """
     blacklist = []
     if blacklist_file:
@@ -93,7 +88,7 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
 
 def docker_to_singularity(container, installation, filepath):
     """
-    Convert docker to singularity container
+    # Convert docker to singularity container
     # >>> from glob import glob
     # >>> glob('%s/abundancebin:1.0.1--0' % filepath)
     # []
@@ -110,123 +105,16 @@ def docker_to_singularity(container, installation, filepath):
     else:
         return None
 
-
-def get_test(container):
-    """
-    Downloading tarball from anaconda for test
-    # >>> get_test('abundancebin:1.0.1--0')
-    # {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'import_lang': 'python -c', 'container': 'abundancebin:1.0.1--0'}
-    # >>> get_test('snakemake:3.11.2--py34_1')
-    # {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
-    # >>> get_test('perl-yaml:1.15--pl5.22.0_0')
-    # {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
-    """
-
-    package_tests = {}
-    name = container.replace('--', ':').split(':') # list consisting of [name, version, (build, if present)]
-
-    r = requests.get("https://anaconda.org/bioconda/%s/%s/download/linux-64/%s.tar.bz2" % (name[0], name[1], '-'.join(name)))
-    
-    try:
-        tarball = tarfile.open(mode="r:bz2", fileobj=BytesIO(r.content))
-    except tarfile.ReadError:
-        pass
-    else:
-        try: # try to open meta.yaml
-            metafile = tarball.extractfile('info/recipe/meta.yaml')
-            
-        except KeyError: # if it's not there ...
-            logging.error("meta.yaml file not present.")
-        else:
-            meta_yaml = yaml.load(Template(metafile.read().decode('utf-8')).render()) # run the file through the jinja processing
-            try:
-                if meta_yaml['test']['commands'] != [None]:
-                    package_tests['commands'] = meta_yaml['test']['commands']
-            except KeyError:
-                pass
-
-            try:
-                if meta_yaml['test']['imports'] != [None]:
-                    package_tests['imports'] = meta_yaml['test']['imports']
-            except KeyError:
-                pass
-            
-            #need to know what scripting languages are needed to run the container
-            try:
-                requirements = list(meta_yaml['requirements']['run'])
-            except (KeyError, TypeError):
-                pass
-            else:
-                for requirement in requirements:
-                    if requirement.split()[0] == 'perl':
-                        package_tests['import_lang'] = 'perl -e'
-                        break
-                    # elif ... :
-                        # other languages if necessary ... hopefully python and perl should suffice though
-                else: # python by default
-                    package_tests['import_lang'] = 'python -c'
-
-        if not package_tests: # if meta.yaml was not present or there were no tests in it, try and get run_test.sh instead
-            try:
-                run_test = tarball.extractfile('info/recipe/run_test.sh')
-                package_tests['commands'] = run_test.read()
-            except KeyError:
-                logging.error("run_test.sh file not present.")
-
-    package_tests['container'] = container
-    return package_tests # {'commands': ...}
-
-
-def mulled_get_test(container):
-    """
-    Gets test for hashed containers
-    # >>> print(mulled_get_test('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'))
-    # {'commands': ['bamtools --help', 'samtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
-
-    """
-
-    package_tests = {'commands': [], 'imports': [], 'container': container, 'import_lang': 'python -c'}
-
-    global github_hashes # ???
-
-    github_hashes = json.loads(requests.get('https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations/').text)
-    packages = []
-    for item in github_hashes: # check if the container name is in the github repo
-        if item['name'].split('.')[0] == container: # remove .tsv file ext before comparing name
-            packages = requests.get(item['download_url']).text.split(',') # get names of packages from github
-            packages = [package.split('=') for package in packages]
-
-    containers = []
-    for package in packages:
-        r = requests.get("https://anaconda.org/bioconda/%s/files" % package[0])
-        p = '-'.join(package)
-        for line in r.text.split('\n'):
-            if p in line:
-                build = line.split(p)[1].split('.tar.bz2')[0]
-                if build == "":
-                    containers.append('%s:%s' % (package[0], package[1]))
-                else:
-                    containers.append('%s:%s-%s' % (package[0], package[1], build))
-                break
-    
-    for container in containers:
-        tests = get_test(container)
-        package_tests['commands'] += tests.get('commands', [])
-        for imp in tests.get('imports', []): # not a very nice solution but probably the simplest
-            package_tests['imports'].append("%s 'import %s'" % (tests['import_lang'], imp)) 
-
-    return package_tests
-
 def test_singularity_container(tests, installation, filepath):
     """
-    Run tests, record if they pass or fail
-    >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}})
-    >>> 'samtools:1.6--0' in results['passed']
-    True
-    >>> results['failed'][0]['imports'] == ['pyBigWig']
-    True
-    >>> 'yasm:1.3.0--0' in results['notest']
-    True
+    # Run tests, record if they pass or fail
+    # >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}})
+    # >>> 'samtools:1.6--0' in results['passed']
+    # True
+    # >>> results['failed'][0]['imports'] == ['pyBigWig']
+    # True
+    # >>> 'yasm:1.3.0--0' in results['notest']
+    # True
     """
     test_results = {'passed': [], 'failed': [], 'notest': []}
     for container, test in tests.items():
@@ -281,7 +169,14 @@ def main():
                         help="File path where Singularity containers are stored.")
     parser.add_argument('-i', '--installation', dest='installation',
                         help="File path of Singularity installation.")
-
+    parser.add_argument('--deep-search', dest='deep_search', default=False,
+                        help="Perform a more extensive, but probably slower, search for tests.")
+    parser.add_argument('--anaconda-channel', dest='anaconda_channel', default='bioconda',
+                        help="Anaconda channel to search for tests (default: bioconda).")
+    parser.add_argument('--github-repo', dest='github_repo',
+                        help="Github repository to search for tests - only relevant if --deep-search is activated (default: bioconda/bioconda-recipes")
+    parser.add_argument('--github-local-path', dest='github_local_path', default=None,
+                        help="If the bioconda-recipes repository (or other repository containing tests) is available locally, provide the path here. Only relevant if --deep-search is activated.")
 
     args = parser.parse_args()
 
@@ -300,9 +195,9 @@ def main():
             tests = {}
             for container in containers:
                 if container[0:6] == 'mulled': # if it is a 'hashed container'
-                    tests[container] = mulled_get_test(container)
+                    tests[container] = hashed_test_search(container, args.github_local_path, args.deep_search, args.anaconda_channel, args.github_repo)
                 else:
-                    tests[container] = get_test(container)
+                    tests[container] = test_search(container, args.github_local_path, args.deep_search, args.anaconda_channel, args.github_repo)
             test_results = test_singularity_container(tests, args.installation, args.filepath)
     
             f.write('\n\tTEST PASSED:')

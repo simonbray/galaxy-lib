@@ -32,14 +32,14 @@ def quay_versions(namespace, pkg_name):
         return []
 
     if 'tags' not in data:
-        raise Exception("Unexpected response from quay.io - not tags description found [%s]" % data)
+        raise Exception("Unexpected response from quay.io - no tags description found [%s]" % data)
 
     return [tag for tag in data['tags'] if tag != 'latest']
 
 
 def quay_repository(namespace, pkg_name):
     if requests is None:
-        raise Exception("requets library is unavailable, functionality not available.")
+        raise Exception("requests library is unavailable, functionality not available.")
 
     assert namespace is not None
     assert pkg_name is not None
@@ -206,6 +206,13 @@ def v2_image_name(targets, image_build=None, name_override=None):
             suffix = ":%s%s" % (version_hash_str, build_suffix)
         return "mulled-v2-%s%s" % (package_hash.hexdigest(), suffix)
 
+def split_container_name(name):
+    """
+    Takes a container name (e.g. samtools:1.7--1) and returns a list (e.g. ['samtools', '1.7', '1'])
+    >>> split_container_name('samtools:1.7--1')
+    ['samtools', '1.7', '1']
+    """
+    return name.replace('--', ':').split(':')
 
 image_name = v1_image_name  # deprecated
 
@@ -220,4 +227,6 @@ __all__ = (
     "v1_image_name",
     "v2_image_name",
     "version_sorted",
+    "split_container_name",
 )
+

@@ -86,6 +86,19 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
         blacklist = open(blacklist_file).read().split('\n')
     return [n for n in quay_list if n not in singularity_list and n not in blacklist]
 
+def get_container_list_from_file(filename):
+    """
+    Returns a list of containers stored in a file (one on each line)
+    >>> import tempfile
+    >>> listfile = tempfile.NamedTemporaryFile(delete=False)
+    >>> listfile.write('bbmap:36.84--0\\nbiobambam:2.0.42--0\\nconnor:0.5.1--py35_0\\ndiamond:0.8.26--0\\nedd:1.1.18--py27_0')
+    >>> listfile.close()
+    >>> get_container_list_from_file(listfile.name)
+    ['bbmap:36.84--0', 'biobambam:2.0.42--0', 'connor:0.5.1--py35_0', 'diamond:0.8.26--0', 'edd:1.1.18--py27_0']
+    >>> 
+    """
+    return open(filename).read().split('\n')
+   
 def docker_to_singularity(container, installation, filepath):
     """
     # Convert docker to singularity container
@@ -158,7 +171,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='Updates index of singularity containers.')
     parser.add_argument('-c', '--containers', dest='containers', nargs='+', default=None,
-                        help="Containers to be generated. If not given, all new additions to the quay biocontainers repository will be generated.")
+                        help="Name of file containing list of containers to be generated. If not given, all new additions to the quay biocontainers repository will be generated.")
     parser.add_argument('-nt', '--no-testing', dest='no_testing', action="store_true",
                         help="Skip testing of generated containers (not recommended).")
     parser.add_argument('-b', '--blacklist', dest='blacklist', default=None, 
@@ -183,7 +196,7 @@ def main():
     if not args.containers:
         containers = get_missing_containers(quay_list=get_quay_containers(), singularity_list=get_singularity_containers(), blacklist_file=args.blacklist)
     else:
-        containers = args.containers
+        containers = get_container_list_from_file(args.containers)
 
     with open(args.logfile, 'w') as f:
         f.write("SINGULARITY CONTAINERS GENERATED:")

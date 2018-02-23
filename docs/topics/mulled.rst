@@ -92,6 +92,9 @@ you could do something along these lines.
   
    $ mulled-build push 'pandoc=1.17.2--0' --test 'pandoc --help' -n biocontainers
 
+Build Singularity containers from Docker containers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Singularity containers can be built from Docker containers using the mulled-update-singularity-containers command
 
 .. _Galaxy: https://galaxyproject.org/
 .. _CWL: http://www.commonwl.org/

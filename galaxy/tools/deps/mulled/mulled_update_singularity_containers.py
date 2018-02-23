@@ -179,7 +179,7 @@ def main():
     parser.add_argument('-o', '--logfile', dest='logfile', default='singularity.log',
                         help="Filename for a log to be written to.")
     parser.add_argument('-f', '--filepath', dest='filepath',
-                        help="File path where Singularity containers are stored.")
+                        help="File path where newly-built Singularity containers are placed.")
     parser.add_argument('-i', '--installation', dest='installation',
                         help="File path of Singularity installation.")
     parser.add_argument('--deep-search', dest='deep_search', default=False,

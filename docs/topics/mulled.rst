@@ -94,7 +94,27 @@ you could do something along these lines.
 
 Build Singularity containers from Docker containers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Singularity containers can be built from Docker containers using the mulled-update-singularity-containers command
+Singularity containers can be built from Docker containers using the mulled-update-singularity-containers command.
+
+To generate a single container:
+
+   $ mulled-update-singularity-containers --containers samtools:1.6--0 --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
+
+``--containers`` indicates the container name (here ``samtools:1.6--0``), ``--logfile`` the name of a log file containing test results, ``--filepath`` the location where the containers should be placed, and ``--installation`` the location of the Singularity installation. This can be found using ``whereis singularity``.
+
+Multiple containers can be installed simultaneously by giving ``--containers`` more than one argument:
+   $ mulled-update-singularity-containers --containers samtools:1.6--0 --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
+
+For a large number of containers, it may be more convenient to employ the ``--container-list`` option:
+   $ mulled-update-singularity-containers --container-list list.txt --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
+Here ``list.txt`` should contain a list of containers, each on a new line.
+
+Alternatively, invoking the ``--all`` argument will build all Docker containers located at https://quay.io/organization/biocontainers/ which do not have a corresponding Singularity container at https://depot.galaxyproject.org/singularity/.
+   $ mulled-update-singularity-containers --all --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
+
+In this case the ``--blacklist`` option may be used to exclude containers which should not be generated:
+   $ mulled-update-singularity-containers --all --blacklist blacklist.txt --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
+``blacklist.txt`` should contain a list of the 'blacklisted' containers, each on a new line.
 
 .. _Galaxy: https://galaxyproject.org/
 .. _CWL: http://www.commonwl.org/

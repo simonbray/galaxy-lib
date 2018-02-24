@@ -168,14 +168,17 @@ def test_singularity_container(tests, installation, filepath):
     return test_results
 
 def main():
-    
     parser = argparse.ArgumentParser(description='Updates index of singularity containers.')
     parser.add_argument('-c', '--containers', dest='containers', nargs='+', default=None,
-                        help="Name of file containing list of containers to be generated. If not given, all new additions to the quay biocontainers repository will be generated.")
+                        help="Containers to be generated. If the number of containers is large, it may be simpler to use the --containers-list option.")
+    parser.add_argument('-l', '--container-list', dest='container_list', default=None,
+                        help="Name of file containing list of containers to be generated. Alternative to --containers.")
+    parser.add_argument('-a', '--all', dest='all', default=False,
+                        help="All new additions to the quay biocontainers repository will be generated.")
     parser.add_argument('-nt', '--no-testing', dest='no_testing', action="store_true",
                         help="Skip testing of generated containers (not recommended).")
     parser.add_argument('-b', '--blacklist', dest='blacklist', default=None, 
-                        help="Provide a 'blacklist file' containing containers which should not be processed.")
+                        help="To be used in combination with --all; provide a 'blacklist file' containing containers which should not be processed.")
     parser.add_argument('-o', '--logfile', dest='logfile', default='singularity.log',
                         help="Filename for a log to be written to.")
     parser.add_argument('-f', '--filepath', dest='filepath',
@@ -193,10 +196,15 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.containers:
+    if args.containers:
+        containers = args.containers
+    elif args.container_list:
+        containers = get_container_list_from_file(args.containers)
+    elif args.all:
         containers = get_missing_containers(quay_list=get_quay_containers(), singularity_list=get_singularity_containers(), blacklist_file=args.blacklist)
     else:
-        containers = get_container_list_from_file(args.containers)
+        print("One of --containers, --container-list, or --all should be selected.")
+        return
 
     with open(args.logfile, 'w') as f:
         f.write("SINGULARITY CONTAINERS GENERATED:")
@@ -229,6 +237,6 @@ def main():
                 f.write('\n\t%s' % container)
 
 if __name__ == "__main__":
-    # main()
-    import doctest
-    doctest.testmod()
+    main()
+    # import doctest
+    # doctest.testmod()

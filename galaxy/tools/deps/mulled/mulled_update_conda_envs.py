@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from mulled_update_singularity_containers import get_quay_containers
+from mulled_list import get_quay_containers
 from get_tests import test_search, hashed_test_search
 import subprocess
 #from mulled_build import check_output
@@ -7,33 +7,6 @@ from subprocess import check_output
 import logging
 from glob import glob
 import argparse
-
-def get_conda_envs(filepath):
-    """
-    Gets list of already existing envs
-    # >>> t = get_conda_envs()
-    # >>> 'samtools:latest' in t
-    # True
-    """
-
-    return [n.split('__')[-1].replace('@', ':') for n in glob('%s/*' % filepath)]
-
-def get_missing_envs(quay_list, conda_list, blacklist_file=None):
-    """
-    >>> import tempfile
-    >>> blacklist = tempfile.NamedTemporaryFile(delete=False)
-    >>> blacklist.write('l\\n\\ng\\nn\\nr')
-    >>> blacklist.close()
-    >>> get_missing_envs(quay_list=['1', '2', '3', 'h--1', 'g--2', 'r'], conda_list=['3', '4', '5'], blacklist_file=blacklist.name)
-    ['1', '2', 'h--1']
-    """
-    list_to_return = []
-    blacklist = []
-    if blacklist_file:
-        blacklist = open(blacklist_file).read().split('\n')
-
-    return [n for n in quay_list if n.split('--')[0] not in conda_list and n.split('--')[0] not in blacklist]
-
 
 def extract_env_from_container(container, filepath): #container as name:build--version
     """

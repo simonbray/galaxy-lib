@@ -28,11 +28,16 @@ Some examples of using these tools are described below.
 Search for containers
 ^^^^^^^^^^^^^^^^^^^^^
 
-This will search for containers in the biocontainers organisation.
+This will search for Docker containers (in the biocontainers organisation on quay.io), Singularity containers (located at https://depot.galaxyproject.org/singularity/), Conda packages (in the bioconda channel), and GitHub files (on the bioconda-recipes repository. 
 
 .. code-block:: bash
 
-   $ mulled-search -s vsearch -o biocontainers
+   $ mulled-search --destination docker conda --search vsearch
+
+The user can specify the location(s) for a search using the ``--destination`` option. The search term is specified using ``--search``. Multiple search terms can be specified simultaneously; in this case, the search will also encompass multi-package containers. For example, ``--search samtools bamtools``, will return ``mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0``, in addition to all individual samtools and bamtools results.
+
+If the user wishes to specify a quay.io organization or Conda channel for the search, this may be done using the ``--organization`` and ``--channel`` options respectively, e.g. ``--channel conda-forge``. Enabling ``--json`` causes results to be returned in JSON format.
+
 
 Build all packages from bioconda from the last 24h
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -102,15 +107,13 @@ To generate a single container:
 
    $ mulled-update-singularity-containers --containers samtools:1.6--0 --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
 
-.. code-block:: bash
-
-``--containers`` indicates the container name (here ``samtools:1.6--0``), ``--logfile`` the name of a log file containing test results, ``--filepath`` the location where the containers should be placed, and ``--installation`` the location of the Singularity installation. This can be found using ``whereis singularity``.
+``--containers`` indicates the container name (here ``samtools:1.6--0``), ``--filepath`` the location where the containers should be placed, and ``--installation`` the location of the Singularity installation. (This can be found using ``whereis singularity``.)
 
 Multiple containers can be installed simultaneously by giving ``--containers`` more than one argument:
 
 .. code-block:: bash
 
-   $ mulled-update-singularity-containers --containers samtools:1.6--0 --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
+   $ mulled-update-singularity-containers --containers samtools:1.6--0 bamtools:2.4.1--0 --filepath /tmp/sing/ --installation /usr/local/bin/singularity
 
 .. code-block:: bash
 
@@ -118,23 +121,19 @@ For a large number of containers, it may be more convenient to employ the ``--co
 
 .. code-block:: bash
 
-   $ mulled-update-singularity-containers --container-list list.txt --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
-
-.. code-block:: bash
+   $ mulled-update-singularity-containers --container-list list.txt --filepath /tmp/sing/ --installation /usr/local/bin/singularity
 
 Here ``list.txt`` should contain a list of containers, each on a new line.
 
-Alternatively, invoking the ``--all`` argument will build all Docker containers located at https://quay.io/organization/biocontainers/ which do not have a corresponding Singularity container at https://depot.galaxyproject.org/singularity/.
+In order to generate the list file the ``mulled-list`` command may be useful. The following command returns a list of all Docker containers available on the quay.io biocontainers organization, excluding those already available as Singularity containers via https://depot.galaxyproject.org/singularity/.:: bash
 
-.. code-block:: bash
+   $ mulled-list --source docker --not-singularity --blacklist blacklist.txt --file output.txt
 
-   $ mulled-update-singularity-containers --all --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
+The list of containers will be saved as ``output.txt``. The (optional) ``--blacklist`` option may be used to exclude containers which should not included in the output; ``blacklist.txt`` should contain a list of the 'blacklisted' containers, each on a new line.
 
-.. code-block:: bash
+Containers, once generated, should be tested. This can be achieved by affixing ``--testing test-output.log`` to the command, or alternatively, by use of the dedicated ``mulled-singularity-testing`` tool.:: bash
 
-In this case the ``--blacklist`` option may be used to exclude containers which should not be generated:
-   $ mulled-update-singularity-containers --all --blacklist blacklist.txt --logfile /tmp/sing/test.log --filepath /tmp/sing/ --installation /usr/local/bin/singularity
-``blacklist.txt`` should contain a list of the 'blacklisted' containers, each on a new line.
+   $ mulled-singularity-testing --container-list list.txt --filepath /tmp/sing/ --installation /usr/local/bin/singularity --logfile test-output.txt
 
 .. _Galaxy: https://galaxyproject.org/
 .. _CWL: http://www.commonwl.org/

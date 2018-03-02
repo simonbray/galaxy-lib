@@ -28,7 +28,7 @@ def get_commands_from_yaml(file):
     package_tests = {}
 
     try:
-        meta_yaml = yaml.load(Template(file.decode('utf-8')).render()) # run the file through the jinja processing
+        meta_yaml = yaml.load(Template(file).render()) # run the file through the jinja processing
     except ScannerError: # should not occur due to the above
         logging.info('ScannerError')
         return None

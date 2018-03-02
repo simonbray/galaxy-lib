@@ -7,10 +7,10 @@ import tempfile
 import urllib2
 import logging
 from lxml import html
-from mulled_update_singularity_containers import get_singularity_containers
+from mulled_list import get_singularity_containers
 
 #import subprocess
-import conda_api
+from conda.cli.python_api import run_command
 
 try:
     import requests
@@ -120,9 +120,9 @@ class CondaSearch():
 
     >>> t = CondaSearch('bioconda')
     
-    >>> t.process_json(t.get_json("adsfasdf"), "adsfasdf")
+    >>> t.get_json("adsfasdf")
     []
-    >>> {'version': u'2.2.0', 'package': u'bioconductor-gosemsim'} in t.process_json(t.get_json("bioconductor-gosemsim"), "bioconductor-gosemsim") 
+    >>> {'version': u'2.2.0', 'build': u'0', 'package': u'bioconductor-gosemsim'} in t.get_json("bioconductor-gosemsim")
     True
     """
 
@@ -134,28 +134,11 @@ class CondaSearch():
         Function takes search_string variable and returns results from the bioconda channel in JSON format 
 
         """
-        conda_api.set_root_prefix()
-        json_output = conda_api.search(search_string, channel=self.channel)
-
-        return json_output
-
-    def process_json(self, json_input, search_string):
-        """
-        Function takes JSON input and processes it, returning the required data
-        """
-        results = []
-
-        if json_input.get('exception_name', False):
-            return results # if the search fails, probably because there are no results
-
-        for package_name, package_info in json_input.iteritems():
-            for item in package_info:
-                version = item['version']
-                if {'package': package_name, 'version': version} not in results: # don't duplicate results
-                    results.append({'package': package_name, 'version': version})
-                    #no_of_versions += 1
-        return results
-
+        raw_out, err, exit_code = run_command('search', '-c %s %s' % (self.channel, search_string), use_exception_handler=True)
+        if exit_code != 0:
+            logging.info('Search failed with: %s' % err)
+            return []
+        return [{'package': n.split()[0], 'version': n.split()[1], 'build': n.split()[2]} for n in raw_out.split('\n')[2:-1]]
 
 class GitHubSearch():
     """
@@ -290,7 +273,7 @@ def readable_output(json):
                 lines.append(['quay', result['package'], result['version'], 'docker pull quay.io/biocontainers/%s:%s\n' % (result['package'], result['version'])]) # NOT a real solution
         for search_string, results in json.get('conda', {}).items():
             for result in results:
-                lines.append(['conda', result['package'], result['version'], 'conda install -c bioconda %s=%s\n' % (result['package'], result['version'])])
+                lines.append(['conda', result['package'], '%s--%s' % (result['version'], result['build']), 'conda install -c bioconda %s=%s=%s\n' % (result['package'], result['version'], result['build'])])
         for search_string, results in json.get('singularity', {}).items():
             for result in results:
                 lines.append(['singularity', result['package'], result['version'], 'wget https://depot.galaxyproject.org/singularity/%s:%s\n' % (result['package'], result['version'])])
@@ -359,8 +342,7 @@ def main(argv=None):
         conda = CondaSearch(args.channel_string)
 
         for item in args.search:
-            conda_json = conda.get_json(item)
-            conda_results[item] = conda.process_json(conda_json, item)
+            conda_results[item] = conda.get_json(item)
         json_results['conda'] = conda_results
 
     if 'github' in args.search_dest:
@@ -400,7 +382,7 @@ def main(argv=None):
         readable_output(json_results)
 
 if __name__ == "__main__":
-    # main()
+    main()
 
-    import doctest
-    doctest.testmod()
+    # import doctest
+    # doctest.testmod()

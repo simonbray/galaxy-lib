@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import requests
 import subprocess
 import tarfile
@@ -19,14 +20,14 @@ from glob import glob
 yaml = YAML()
 yaml.allow_duplicate_keys = True
 
-def get_container_list_from_file(filename):
+def get_list_from_file(filename):
     """
     Returns a list of containers stored in a file (one on each line)
     >>> import tempfile
     >>> listfile = tempfile.NamedTemporaryFile(delete=False)
     >>> listfile.write('bbmap:36.84--0\\nbiobambam:2.0.42--0\\nconnor:0.5.1--py35_0\\ndiamond:0.8.26--0\\nedd:1.1.18--py27_0')
     >>> listfile.close()
-    >>> get_container_list_from_file(listfile.name)
+    >>> get_list_from_file(listfile.name)
     ['bbmap:36.84--0', 'biobambam:2.0.42--0', 'connor:0.5.1--py35_0', 'diamond:0.8.26--0', 'edd:1.1.18--py27_0']
     >>> 
     """
@@ -66,6 +67,9 @@ def test_singularity_container(tests, installation, filepath):
     # True
     """
     test_results = {'passed': [], 'failed': [], 'notest': []}
+
+    os.mkdir("/tmp/sing_home") # create a 'sanitised home' directory in which the containers may be mounted - see http://singularity.lbl.gov/faq#solution-1-specify-the-home-to-mount
+
     for container, test in tests.items():
         if 'commands' not in test and 'imports' not in test:
             test_results['notest'].append(container)
@@ -80,10 +84,10 @@ def test_singularity_container(tests, installation, filepath):
                     command = command.replace('$R ', 'Rscript ')
                     
                     try:
-                        check_output("%s exec -H /tmp/foo %s/%s bash -c \"%s\"" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
+                        check_output("%s exec -H /tmp/sing_home %s/%s bash -c \"%s\"" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e1:
                         try:
-                            check_output("%s exec -H /tmp/foo %s/%s %s" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
+                            check_output("%s exec -H /tmp/sing_home %s/%s %s" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
                         except subprocess.CalledProcessError as e2:
                             errors.append({'command': command, 'output': e2.output})
                             test_passed = False
@@ -91,7 +95,7 @@ def test_singularity_container(tests, installation, filepath):
             if test.get('imports', False):
                 for imp in test['imports']:
                     try:
-                        check_output("%s exec -H /tmp/foo %s/%s %s 'import %s'" % (installation, filepath, container, test['import_lang'], imp), stderr=subprocess.STDOUT, shell=True)
+                        check_output("%s exec -H /tmp/sing_home %s/%s %s 'import %s'" % (installation, filepath, container, test['import_lang'], imp), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e:
                         errors.append({'import': imp, 'output': e.output})
                         test_passed = False
@@ -101,6 +105,7 @@ def test_singularity_container(tests, installation, filepath):
             else:
                 test['errors'] = errors
                 test_results['failed'].append(test)
+    os.rmdir("/tmp/sing_home")
     return test_results
 
 def main():
@@ -123,7 +128,7 @@ def main():
     if args.containers:
         containers = args.containers
     elif args.container_list:
-        containers = get_container_list_from_file(args.container_list)
+        containers = get_list_from_file(args.container_list)
     else:
         print("Either --containers or --container-list should be selected.")
         return
@@ -160,9 +165,9 @@ def test(args=None):
     if args['containers']:
         containers = args['containers']
     elif args['container_list']:
-        containers = get_container_list_from_file(args['container_list'])
+        containers = get_list_from_file(args['container_list'])
     else: # if no containers are specified, test everything in the filepath
-        containers = [n.split(filepath)[1] for n in glob('%s*' % filepath)]
+        containers = [n.split(args['filepath'])[1] for n in glob('%s*' % args['filepath'])]
 
     with open(args['logfile'], 'w') as f:
         f.write("SINGULARITY CONTAINERS GENERATED:")

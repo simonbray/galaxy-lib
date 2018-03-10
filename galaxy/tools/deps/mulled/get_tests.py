@@ -5,12 +5,12 @@ searches for tests for packages in the bioconda-recipes repo and on Anaconda, lo
 
 A shallow search (default for singularity and conda generation scripts) just checks once on Anaconda for the specified version.
 """
-
-from glob import glob
-import tarfile
 import json
+import tarfile
+from glob import glob
 import logging
 from io import BytesIO
+import doctest
 
 import requests
 from jinja2 import Template
@@ -61,7 +61,7 @@ def get_commands_from_yaml(file):
             if requirement.split()[0] == 'perl':
                 package_tests['import_lang'] = 'perl -e'
                 break
-             # elif ... :
+            # elif ... :
                 # other languages if necessary ... hopefully python and perl should suffice though
         else:  # python by default
             package_tests['import_lang'] = 'python -c'
@@ -120,7 +120,7 @@ def get_test_from_anaconda(url):
         if package_tests:
             return package_tests
 
-     # this part is perhaps unnecessary, but some of the older tarballs have a testfile with .yaml.template ext
+    # this part is perhaps unnecessary, but some of the older tarballs have a testfile with .yaml.template ext
     try:
         metafile = tarball.extractfile('info/recipe/meta.yaml.template')
     except (tarfile.ReadError, KeyError, TypeError):
@@ -130,7 +130,7 @@ def get_test_from_anaconda(url):
         if package_tests:
             return package_tests
 
-     # if meta.yaml was not present or there were no tests in it, try and get run_test.sh instead
+    # if meta.yaml was not present or there were no tests in it, try and get run_test.sh instead
     try:
         run_test = tarball.extractfile('info/recipe/run_test.sh')
         return get_run_test(run_test)
@@ -242,7 +242,7 @@ def deep_test_search(container, recipes_path=None, anaconda_channel='bioconda', 
         if result:
             return result
 
-     # if everything fails
+    # if everything fails
     return {'container': container}
 
 
@@ -258,7 +258,7 @@ def test_search(container, recipes_path=None, deep=False, anaconda_channel='bioc
     """
     if deep:  # do a deep search
         return deep_test_search(container, recipes_path, anaconda_channel, github_repo)
-     # else shallow
+    # else shallow
     result = try_a_func(get_test_from_anaconda, get_anaconda_url, (container, anaconda_channel), container)
     if result:
         return result
@@ -303,5 +303,5 @@ def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channe
     return package_tests
 
 
-import doctest
+
 doctest.testmod()

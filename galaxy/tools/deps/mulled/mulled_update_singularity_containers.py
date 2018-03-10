@@ -1,24 +1,12 @@
 #!/usr/bin/env python
 
 import os
-import requests
 import subprocess
-import tarfile
-from ruamel.yaml import YAML
-from io import BytesIO
-#from mulled_build import check_output
 from subprocess import check_output
-import logging
-from shutil import copy
-import pickle
-import json
 import argparse
-from jinja2 import Template
-from get_tests import test_search, hashed_test_search
 from glob import glob
 
-yaml = YAML()
-yaml.allow_duplicate_keys = True
+from get_tests import hashed_test_search, test_search
 
 
 def get_list_from_file(filename):
@@ -30,7 +18,7 @@ def get_list_from_file(filename):
     >>> listfile.close()
     >>> get_list_from_file(listfile.name)
     ['bbmap:36.84--0', 'biobambam:2.0.42--0', 'connor:0.5.1--py35_0', 'diamond:0.8.26--0', 'edd:1.1.18--py27_0']
-    >>> 
+    >>>
     """
     return [n for n in open(filename).read().split('\n') if n is not '']  # if blank lines are in the file empty strings must be removed
 
@@ -51,9 +39,11 @@ def docker_to_singularity(container, installation, filepath, no_sudo=False):
 
     try:
         if no_sudo:
-            check_output("%s build %s/%s docker://quay.io/biocontainers/%s" % (installation, filepath, container, container), stderr=subprocess.STDOUT, shell=True)
+            check_output("%s build %s/%s docker://quay.io/biocontainers/%s" % (installation,
+                                                                               filepath, container, container), stderr=subprocess.STDOUT, shell=True)
         else:
-            check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" % (installation, filepath, container, container), stderr=subprocess.STDOUT, shell=True)
+            check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" %
+                         (installation, filepath, container, container), stderr=subprocess.STDOUT, shell=True)
     except subprocess.CalledProcessError as e:
         error_info = {'code': e.returncode, 'cmd': e.cmd, 'out': e.output}
         return error_info
@@ -79,7 +69,8 @@ def test_singularity_container(tests, installation, filepath):
     """
     test_results = {'passed': [], 'failed': [], 'notest': []}
 
-    os.mkdir("/tmp/sing_home")  # create a 'sanitised home' directory in which the containers may be mounted - see http://singularity.lbl.gov/faq#solution-1-specify-the-home-to-mount
+    # create a 'sanitised home' directory in which the containers may be mounted - see http://singularity.lbl.gov/faq#solution-1-specify-the-home-to-mount
+    os.mkdir("/tmp/sing_home")
 
     for container, test in tests.items():
         if 'commands' not in test and 'imports' not in test:
@@ -95,18 +86,22 @@ def test_singularity_container(tests, installation, filepath):
                     command = command.replace('$R ', 'Rscript ')
 
                     try:
-                        check_output("%s exec -H /tmp/sing_home %s/%s bash -c \"%s\"" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
+                        check_output("%s exec -H /tmp/sing_home %s/%s bash -c \"%s\"" % (
+                            installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e1:
                         try:
-                            check_output("%s exec -H /tmp/sing_home %s/%s %s" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
+                            check_output("%s exec -H /tmp/sing_home %s/%s %s" % (
+                                installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
                         except subprocess.CalledProcessError as e2:
-                            errors.append({'command': command, 'output': e2.output})
+                            errors.append(
+                                {'command': command, 'output': e2.output})
                             test_passed = False
 
             if test.get('imports', False):
                 for imp in test['imports']:
                     try:
-                        check_output("%s exec -H /tmp/sing_home %s/%s %s 'import %s'" % (installation, filepath, container, test['import_lang'], imp), stderr=subprocess.STDOUT, shell=True)
+                        check_output("%s exec -H /tmp/sing_home %s/%s %s 'import %s'" % (installation, filepath,
+                                                                                         container, test['import_lang'], imp), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e:
                         errors.append({'import': imp, 'output': e.output})
                         test_passed = False
@@ -121,7 +116,8 @@ def test_singularity_container(tests, installation, filepath):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Updates index of singularity containers.')
+    parser = argparse.ArgumentParser(
+        description='Updates index of singularity containers.')
     parser.add_argument('-c', '--containers', dest='containers', nargs='+', default=None,
                         help="Containers to be generated. If the number of containers is large, it may be simpler to use the --containers-list option.")
     parser.add_argument('-l', '--container-list', dest='container_list', default=None,
@@ -146,10 +142,12 @@ def main():
         return
 
     for container in containers:
-        docker_to_singularity(container, args.installation, args.filepath, args.no_sudo)
+        docker_to_singularity(container, args.installation,
+                              args.filepath, args.no_sudo)
 
     if args.testing:
-        test({'anaconda_channel': 'bioconda', 'installation': args.installation, 'filepath': args.filepath, 'github_repo': 'bioconda/bioconda-recipes', 'deep_search': False, 'github_local_path': None, 'logfile': args.testing, 'containers': containers})
+        test({'anaconda_channel': 'bioconda', 'installation': args.installation, 'filepath': args.filepath, 'github_repo': 'bioconda/bioconda-recipes',
+              'deep_search': False, 'github_local_path': None, 'logfile': args.testing, 'containers': containers})
 
 
 def test(args=None):
@@ -180,17 +178,21 @@ def test(args=None):
     elif args['container_list']:
         containers = get_list_from_file(args['container_list'])
     else:  # if no containers are specified, test everything in the filepath
-        containers = [n.split(args['filepath'])[1] for n in glob('%s*' % args['filepath'])]
+        containers = [n.split(args['filepath'])[1]
+                      for n in glob('%s*' % args['filepath'])]
 
     with open(args['logfile'], 'w') as f:
         f.write("SINGULARITY CONTAINERS GENERATED:")
         tests = {}
         for container in containers:
             if container[0:6] == 'mulled':  # if it is a 'hashed container'
-                tests[container] = hashed_test_search(container, args['github_local_path'], args['deep_search'], args['anaconda_channel'], args['github_repo'])
+                tests[container] = hashed_test_search(
+                    container, args['github_local_path'], args['deep_search'], args['anaconda_channel'], args['github_repo'])
             else:
-                tests[container] = test_search(container, args['github_local_path'], args['deep_search'], args['anaconda_channel'], args['github_repo'])
-        test_results = test_singularity_container(tests, args['installation'], args['filepath'])
+                tests[container] = test_search(
+                    container, args['github_local_path'], args['deep_search'], args['anaconda_channel'], args['github_repo'])
+        test_results = test_singularity_container(
+            tests, args['installation'], args['filepath'])
 
         f.write('\n\tTEST PASSED:')
         for container in test_results['passed']:
@@ -199,7 +201,8 @@ def test(args=None):
         for container in test_results['failed']:
             f.write('\n\t\t%s' % container['container'])
             for error in container['errors']:
-                f.write('\n\t\t\tCOMMAND: %s\n\t\t\t\tERROR:%s' % (error.get('command', 'import' + error.get('import', 'nothing found')), error['output']))
+                f.write('\n\t\t\tCOMMAND: %s\n\t\t\t\tERROR:%s' % (error.get(
+                    'command', 'import' + error.get('import', 'nothing found')), error['output']))
         f.write('\n\tNO TEST AVAILABLE:')
         for container in test_results['notest']:
             f.write('\n\t\t%s' % container)

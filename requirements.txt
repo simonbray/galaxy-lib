@@ -3,3 +3,5 @@ docutils
 pyyaml
 ruamel.yaml
 requests
+packaging
+markupsafe

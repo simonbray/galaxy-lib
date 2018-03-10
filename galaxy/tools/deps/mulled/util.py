@@ -3,9 +3,11 @@ from __future__ import print_function
 
 import collections
 import hashlib
+import sys
+import threading
+import time
 
-from distutils.version import LooseVersion
-
+import packaging.version
 try:
     import requests
 except ImportError:
@@ -70,7 +72,7 @@ def split_tag(tag):
 
 def version_sorted(elements):
     """Sort iterable based on loose description of "version" from newest to oldest."""
-    return sorted(elements, key=LooseVersion, reverse=True)
+    return sorted(elements, key=packaging.version.parse, reverse=True)
 
 
 Target = collections.namedtuple("Target", ["package_name", "version", "build"])
@@ -213,6 +215,27 @@ def split_container_name(name):
     ['samtools', '1.7', '1']
     """
     return name.replace('--', ':').split(':')
+
+class PrintProgress(object):
+    def __init__(self):
+        self.thread = threading.Thread(target=self.progress)
+        self.stop = False
+
+    def progress(self):
+        while not self.stop:
+            print(".", end="")
+            sys.stdout.flush()
+            time.sleep(60)
+        print("")
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop = True
+        self.thread.join()
+
 
 image_name = v1_image_name  # deprecated
 

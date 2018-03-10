@@ -6,10 +6,84 @@ History
 .. to_doc
 
 ---------------------
-17.9.10.dev0
+18.5.6.dev0
 ---------------------
 
     
+
+---------------------
+18.5.5 (2018-03-06)
+---------------------
+
+* Fix mulled to use shlex.quote to escape single quotes in test command
+  (thanks to @mbargull).
+* Make markupsafe a dependency since it is import unconditionally in galaxy.tools.toolbox
+  (thanks to @mbargull).
+* Python 3 fix for assertion testing.
+
+---------------------
+18.5.4 (2018-03-01)
+---------------------
+
+* Make conda image for mulled builds configurable via an environment variable
+  (thanks to @mbargull).
+
+---------------------
+18.5.3 (2018-02-28)
+---------------------
+
+* Fix path module for import on Windows for Pulsar.
+
+---------------------
+18.5.2 (2018-02-28)
+---------------------
+
+* Various fixes for library usage mostly related to Conda (with help from @nsoranzo).
+
+---------------------
+18.5.1 (2018-02-26)
+---------------------
+
+* Redo last release - pushed to PyPI without actually including the desired fix.
+
+---------------------
+18.5.0 (2018-02-26)
+---------------------
+
+* Another Python 3 fix for Planemo.
+* Fix galaxy-lib version - this has actually been tracking the 18.05 release of Galaxy for the last two releases.
+
+---------------------
+18.1.0 (2018-02-26)
+---------------------
+
+* More Python 3 fixes for Planemo thanks to @nsoranzo.
+* Bring in the latest Galaxy development branch.
+
+---------------------
+17.9.12 (2018-02-22)
+---------------------
+
+* Python 3 fix for Planemo thanks to @nsoranzo.
+* Fix bad merge of miniconda update for mulled work.
+
+---------------------
+17.9.11 (2018-02-22)
+---------------------
+
+* Update to the latest Galaxy dev just prior to the branch of 18.01.
+* Python 3 fixes.
+
+---------------------
+17.9.10 (2017-11-23)
+---------------------
+
+* Added docs for using mulled-build with your own quay.io account
+  (thanks to @jerowe).
+* Catch errors in Conda search if nothing is found (preventing planemo-monitor
+  from functioning properly) (thanks to @bgruening).
+* Make multi-requirement container building via mulled more stable
+  (thanks to @bgruening).
 
 ---------------------
 17.9.9 (2017-09-27)

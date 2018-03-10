@@ -53,9 +53,12 @@ PACKAGES = [
     'galaxy.tools.verify',
     'galaxy.tools.verify.asserts',
     'galaxy.util',  # Incomplete
+    'galaxy.util.logging',
+    'galaxy.util.path',
 ]
 ENTRY_POINTS = '''
         [console_scripts]
+        galaxy-tool-test=galaxy.tools.verify.script:main
         mulled-build=galaxy.tools.deps.mulled.mulled_build:main
         mulled-build-channel=galaxy.tools.deps.mulled.mulled_build_channel:main
         mulled-search=galaxy.tools.deps.mulled.mulled_search:main

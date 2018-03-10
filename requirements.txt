@@ -1,3 +1,8 @@
 six>=1.9.0
 docutils
 pyyaml
+ruamel.yaml
+requests
+packaging
+markupsafe
+lxml

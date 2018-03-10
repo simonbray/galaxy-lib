@@ -20,6 +20,7 @@ from glob import glob
 yaml = YAML()
 yaml.allow_duplicate_keys = True
 
+
 def get_list_from_file(filename):
     """
     Returns a list of containers stored in a file (one on each line)
@@ -31,17 +32,21 @@ def get_list_from_file(filename):
     ['bbmap:36.84--0', 'biobambam:2.0.42--0', 'connor:0.5.1--py35_0', 'diamond:0.8.26--0', 'edd:1.1.18--py27_0']
     >>> 
     """
-    return [n for n in open(filename).read().split('\n') if n is not ''] # if blank lines are in the file empty strings must be removed
-   
+    return [n for n in open(filename).read().split('\n') if n is not '']  # if blank lines are in the file empty strings must be removed
+
+
 def docker_to_singularity(container, installation, filepath, no_sudo=False):
     """
-    # Convert docker to singularity container
-    # >>> from glob import glob
-    # >>> glob('%s/abundancebin:1.0.1--0' % filepath)
-    # []
-    # >>> docker_to_singularity('abundancebin:1.0.1--0')
-    # >>> glob('%s/abundancebin:1.0.1--0' % filepath)
-    # ['summat/abundancebin:1.0.1--0']
+    Convert docker to singularity container
+    >>> from glob import glob
+    >>> import os, shutil
+    >>> os.mkdir('/tmp/singtest')
+    >>> glob('/tmp/singtest/abundancebin:1.0.1--0')
+    []
+    >>> docker_to_singularity('abundancebin:1.0.1--0', 'singularity', '/tmp/singtest', no_sudo=True)
+    >>> glob('/tmp/singtest/abundancebin:1.0.1--0')
+    ['/tmp/singtest/abundancebin:1.0.1--0']
+    >>> shutil.rmtree('/tmp/singtest')
     """
 
     try:
@@ -55,20 +60,26 @@ def docker_to_singularity(container, installation, filepath, no_sudo=False):
     else:
         return None
 
+
 def test_singularity_container(tests, installation, filepath):
     """
-    # Run tests, record if they pass or fail
-    # >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}})
-    # >>> 'samtools:1.6--0' in results['passed']
-    # True
-    # >>> results['failed'][0]['imports'] == ['pyBigWig']
-    # True
-    # >>> 'yasm:1.3.0--0' in results['notest']
-    # True
+    Run tests, record if they pass or fail
+    >>> import os, shutil
+    >>> os.mkdir('/tmp/singtest')
+    >>> for n in ['pybigwig:0.1.11--py36_0', 'samtools:1.6--0', 'yasm:1.3.0--0']:
+    ...     docker_to_singularity(n, 'singularity', '/tmp/singtest', no_sudo=True)
+    >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}}, 'singularity', '/tmp/singtest')
+    >>> 'samtools:1.6--0' in results['passed']
+    True
+    >>> results['failed'][0]['imports'] == ['pyBigWig']
+    True
+    >>> 'yasm:1.3.0--0' in results['notest']
+    True
+    >>> shutil.rmtree('/tmp/singtest')
     """
     test_results = {'passed': [], 'failed': [], 'notest': []}
 
-    os.mkdir("/tmp/sing_home") # create a 'sanitised home' directory in which the containers may be mounted - see http://singularity.lbl.gov/faq#solution-1-specify-the-home-to-mount
+    os.mkdir("/tmp/sing_home")  # create a 'sanitised home' directory in which the containers may be mounted - see http://singularity.lbl.gov/faq#solution-1-specify-the-home-to-mount
 
     for container, test in tests.items():
         if 'commands' not in test and 'imports' not in test:
@@ -82,7 +93,7 @@ def test_singularity_container(tests, installation, filepath):
                     command = command.replace('$PREFIX', '/usr/local/')
                     command = command.replace('${PREFIX}', '/usr/local/')
                     command = command.replace('$R ', 'Rscript ')
-                    
+
                     try:
                         check_output("%s exec -H /tmp/sing_home %s/%s bash -c \"%s\"" % (installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
                     except subprocess.CalledProcessError as e1:
@@ -91,7 +102,7 @@ def test_singularity_container(tests, installation, filepath):
                         except subprocess.CalledProcessError as e2:
                             errors.append({'command': command, 'output': e2.output})
                             test_passed = False
-                        
+
             if test.get('imports', False):
                 for imp in test['imports']:
                     try:
@@ -107,6 +118,7 @@ def test_singularity_container(tests, installation, filepath):
                 test_results['failed'].append(test)
     os.rmdir("/tmp/sing_home")
     return test_results
+
 
 def main():
     parser = argparse.ArgumentParser(description='Updates index of singularity containers.')
@@ -139,8 +151,9 @@ def main():
     if args.testing:
         test({'anaconda_channel': 'bioconda', 'installation': args.installation, 'filepath': args.filepath, 'github_repo': 'bioconda/bioconda-recipes', 'deep_search': False, 'github_local_path': None, 'logfile': args.testing, 'containers': containers})
 
+
 def test(args=None):
-    if not args: # i.e. if testing is called directly from CLI and not via main()
+    if not args:  # i.e. if testing is called directly from CLI and not via main()
         parser = argparse.ArgumentParser(description='Tests.')
         parser.add_argument('-c', '--containers', dest='containers', nargs='+', default=None,
                             help="Containers to be tested. If the number of containers is large, it may be simpler to use the --containers-list option.")
@@ -166,14 +179,14 @@ def test(args=None):
         containers = args['containers']
     elif args['container_list']:
         containers = get_list_from_file(args['container_list'])
-    else: # if no containers are specified, test everything in the filepath
+    else:  # if no containers are specified, test everything in the filepath
         containers = [n.split(args['filepath'])[1] for n in glob('%s*' % args['filepath'])]
 
     with open(args['logfile'], 'w') as f:
         f.write("SINGULARITY CONTAINERS GENERATED:")
         tests = {}
         for container in containers:
-            if container[0:6] == 'mulled': # if it is a 'hashed container'
+            if container[0:6] == 'mulled':  # if it is a 'hashed container'
                 tests[container] = hashed_test_search(container, args['github_local_path'], args['deep_search'], args['anaconda_channel'], args['github_repo'])
             else:
                 tests[container] = test_search(container, args['github_local_path'], args['deep_search'], args['anaconda_channel'], args['github_repo'])
@@ -186,13 +199,13 @@ def test(args=None):
         for container in test_results['failed']:
             f.write('\n\t\t%s' % container['container'])
             for error in container['errors']:
-                f.write('\n\t\t\tCOMMAND: %s\n\t\t\t\tERROR:%s' % (error.get('command', 'import' + error.get('import', 'nothing found')), error['output']))                
+                f.write('\n\t\t\tCOMMAND: %s\n\t\t\t\tERROR:%s' % (error.get('command', 'import' + error.get('import', 'nothing found')), error['output']))
         f.write('\n\tNO TEST AVAILABLE:')
         for container in test_results['notest']:
             f.write('\n\t\t%s' % container)
 
 
 if __name__ == "__main__":
-    main()
-    # import doctest
-    # doctest.testmod()
+    # main()
+    import doctest
+    doctest.testmod()

@@ -7,17 +7,19 @@ A shallow search (default for singularity and conda generation scripts) just che
 """
 
 from glob import glob
-from ruamel.yaml import YAML
-import requests
 import tarfile
+import json
+import logging
 from io import BytesIO
+
+import requests
+from jinja2 import Template
+from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
 yaml = YAML()
 yaml.allow_duplicate_keys = True
-import logging
-from jinja2 import Template
-import json
 from util import split_container_name
+
 
 def get_commands_from_yaml(file):
     """
@@ -28,27 +30,27 @@ def get_commands_from_yaml(file):
     package_tests = {}
 
     try:
-        meta_yaml = yaml.load(Template(file).render()) # run the file through the jinja processing
-    except ScannerError: # should not occur due to the above
+        meta_yaml = yaml.load(Template(file).render())   # run the file through the jinja processing
+    except ScannerError:   # should not occur due to the above
         logging.info('ScannerError')
         return None
     try:
-        if meta_yaml['test']['commands'] != [None] and meta_yaml['test']['commands'] != None:
+        if meta_yaml['test']['commands'] != [None] and meta_yaml['test']['commands'] is not None:
             package_tests['commands'] = meta_yaml['test']['commands']
     except (KeyError, TypeError):
         logging.info('Error reading commands')
         pass
     try:
-        if meta_yaml['test']['imports'] != [None] and meta_yaml['test']['imports'] != None:
+        if meta_yaml['test']['imports'] != [None] and meta_yaml['test']['imports'] is not None:
             package_tests['imports'] = meta_yaml['test']['imports']
     except (KeyError, TypeError):
         logging.info('Error reading imports')
         pass
-    
+
     if len(package_tests.get('commands', []) + package_tests.get('imports', [])) == 0:
         return None
-    
-    #need to know what scripting languages are needed to run the container
+
+    # need to know what scripting languages are needed to run the container
     try:
         requirements = list(meta_yaml['requirements']['run'])
     except (KeyError, TypeError):
@@ -59,18 +61,18 @@ def get_commands_from_yaml(file):
             if requirement.split()[0] == 'perl':
                 package_tests['import_lang'] = 'perl -e'
                 break
-            # elif ... :
+             # elif ... :
                 # other languages if necessary ... hopefully python and perl should suffice though
-        else: # python by default
+        else:  # python by default
             package_tests['import_lang'] = 'python -c'
     return package_tests
-    
+
 
 def get_run_test(file):
     """
     Gets tests from a run_test.sh file
-    >>> get_run_test('#!/bin/bash\\npslScore 2> /dev/null || [[ "$?" == 255 ]]')
-    {'commands': ['#!/bin/bash && pslScore 2> /dev/null || [[ "$?" == 255 ]]']}
+    >>> get_run_test(' #!/bin/bash\\npslScore 2> /dev/null || [[ "$?" == 255 ]]')
+    {'commands': [' #!/bin/bash && pslScore 2> /dev/null || [[ "$?" == 255 ]]']}
     """
     package_tests = {}
     package_tests['commands'] = [file.replace('\n', ' && ')]
@@ -83,8 +85,9 @@ def get_anaconda_url(container, anaconda_channel='bioconda'):
     >>> get_anaconda_url('samtools:1.7--1')
     'https://anaconda.org/bioconda/samtools/1.7/download/linux-64/samtools-1.7-1.tar.bz2'
     """
-    name = split_container_name(container) # list consisting of [name, version, (build, if present)]
+    name = split_container_name(container)  # list consisting of [name, version, (build, if present)]
     return "https://anaconda.org/%s/%s/%s/download/linux-64/%s.tar.bz2" % (anaconda_channel, name[0], name[1], '-'.join(name))
+
 
 def prepend_anaconda_url(url):
     """
@@ -94,6 +97,7 @@ def prepend_anaconda_url(url):
     """
     return 'https://anaconda.org%s' % url
 
+
 def get_test_from_anaconda(url):
     """
     Given the URL of an anaconda tarball, returns tests
@@ -101,7 +105,7 @@ def get_test_from_anaconda(url):
     {'commands': ['samtools --help'], 'import_lang': 'python -c'}
     """
     r = requests.get(url)
-    
+
     try:
         tarball = tarfile.open(mode="r:bz2", fileobj=BytesIO(r.content))
     except tarfile.ReadError:
@@ -116,23 +120,23 @@ def get_test_from_anaconda(url):
         if package_tests:
             return package_tests
 
-    # this part is perhaps unnecessary, but some of the older tarballs have a testfile with .yaml.template ext
+     # this part is perhaps unnecessary, but some of the older tarballs have a testfile with .yaml.template ext
     try:
         metafile = tarball.extractfile('info/recipe/meta.yaml.template')
     except (tarfile.ReadError, KeyError, TypeError):
         pass
     else:
         package_tests = get_commands_from_yaml(metafile)
-        if package_tests: 
+        if package_tests:
             return package_tests
 
-    # if meta.yaml was not present or there were no tests in it, try and get run_test.sh instead
-    try: 
+     # if meta.yaml was not present or there were no tests in it, try and get run_test.sh instead
+    try:
         run_test = tarball.extractfile('info/recipe/run_test.sh')
         return get_run_test(run_test)
     except KeyError:
-        return None
         logging.info("run_test.sh file not present.")
+        return None
 
 
 def find_anaconda_versions(name, anaconda_channel='bioconda'):
@@ -148,6 +152,7 @@ def find_anaconda_versions(name, anaconda_channel='bioconda'):
             urls.append(line.split('"')[1])
     return urls
 
+
 def open_recipe_file(file, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
     """
     Opens a file at a particular location and returns contents as string
@@ -156,12 +161,13 @@ def open_recipe_file(file, recipes_path=None, github_repo='bioconda/bioconda-rec
     """
     if recipes_path:
         return open('%s/%s' % (recipes_path, file)).read()
-    else: # if no clone of the repo is available locally, download from GitHub
+    else:  # if no clone of the repo is available locally, download from GitHub
         r = requests.get('https://raw.githubusercontent.com/%s/master/%s' % (github_repo, file))
         if r.status_code == 404:
             raise IOError
         else:
             return r.text
+
 
 def get_alternative_versions(filepath, filename, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
     """
@@ -173,7 +179,7 @@ def get_alternative_versions(filepath, filename, recipes_path=None, github_repo=
     True
     >>> t = get_alternative_versions('recipes/samtools', 'meta.yaml', recipes_path='/home/simon/GitRepos/bioconda-recipes')
     >>> len(t)
-    10
+    11
     >>> 'recipes/samtools/0.1.19/meta.yaml' in t
     True
     """
@@ -188,6 +194,7 @@ def get_alternative_versions(filepath, filename, recipes_path=None, github_repo=
                 versions.append('%s/%s' % (subfile['path'], filename))
     return versions
 
+
 def try_a_func(func1, func2, param, container):
     """
     Tries to perform a function (or actually a combination of two functions: first getting the file and then processing it)
@@ -200,22 +207,23 @@ def try_a_func(func1, func2, param, container):
         result['container'] = container
         return result
 
+
 def deep_test_search(container, recipes_path=None, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
     """
     Deep search looks in bioconda-recipes repo as well as anaconda for the tests, checking in multiple possible locations. If no test is found for the specified version it also searches if other package versions have a test available.
     """
     name = split_container_name(container)
     for f in [
-                (get_commands_from_yaml, open_recipe_file, ('recipes/%s/%s/meta.yaml' % (name[0], name[1]), recipes_path, github_repo), container),
-                (get_run_test, open_recipe_file, ('recipes/%s/%s/run_test.sh' % (name[0], name[1]), recipes_path, github_repo), container),
-                (get_commands_from_yaml, open_recipe_file, ('recipes/%s/meta.yaml' % name[0], recipes_path, github_repo), container),
-                (get_run_test, open_recipe_file, ('recipes/%s/run_test.sh' % name[0], recipes_path, github_repo), container),
-                (get_test_from_anaconda, get_anaconda_url, (container, anaconda_channel), container),
-            ]:
+        (get_commands_from_yaml, open_recipe_file, ('recipes/%s/%s/meta.yaml' % (name[0], name[1]), recipes_path, github_repo), container),
+        (get_run_test, open_recipe_file, ('recipes/%s/%s/run_test.sh' % (name[0], name[1]), recipes_path, github_repo), container),
+        (get_commands_from_yaml, open_recipe_file, ('recipes/%s/meta.yaml' % name[0], recipes_path, github_repo), container),
+        (get_run_test, open_recipe_file, ('recipes/%s/run_test.sh' % name[0], recipes_path, github_repo), container),
+        (get_test_from_anaconda, get_anaconda_url, (container, anaconda_channel), container),
+    ]:
         result = try_a_func(*f)
         if result:
             return result
-        
+
     versions = get_alternative_versions('recipes/%s' % name[0], 'meta.yaml', recipes_path, github_repo)
     for version in versions:
         result = try_a_func(get_commands_from_yaml, open_recipe_file, (version, recipes_path, github_repo), container)
@@ -233,9 +241,10 @@ def deep_test_search(container, recipes_path=None, anaconda_channel='bioconda', 
         result = try_a_func(get_test_from_anaconda, prepend_anaconda_url, (version,), container)
         if result:
             return result
-        
-    # if everything fails
+
+     # if everything fails
     return {'container': container}
+
 
 def test_search(container, recipes_path=None, deep=False, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
     """
@@ -247,13 +256,14 @@ def test_search(container, recipes_path=None, deep=False, anaconda_channel='bioc
     >>> test_search('perl-yaml:1.15--pl5.22.0_0') == {'imports': ['YAML', 'YAML::Any', 'YAML::Dumper', 'YAML::Dumper::Base', 'YAML::Error', 'YAML::Loader', 'YAML::Loader::Base', 'YAML::Marshall', 'YAML::Node', 'YAML::Tag', 'YAML::Types'], 'import_lang': 'perl -e', 'container': 'perl-yaml:1.15--pl5.22.0_0'}
     True
     """
-    if deep: # do a deep search
+    if deep:  # do a deep search
         return deep_test_search(container, recipes_path, anaconda_channel, github_repo)
-    # else shallow
+     # else shallow
     result = try_a_func(get_test_from_anaconda, get_anaconda_url, (container, anaconda_channel), container)
     if result:
         return result
     return {'container': container}
+
 
 def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
     """
@@ -266,9 +276,9 @@ def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channe
 
     github_hashes = json.loads(requests.get('https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations/').text)
     packages = []
-    for item in github_hashes: # check if the container name is in the github repo
-        if item['name'].split('.')[0] == container: # remove .tsv file ext before comparing name
-            packages = requests.get(item['download_url']).text.split(',') # get names of packages from github
+    for item in github_hashes:  # check if the container name is in the github repo
+        if item['name'].split('.')[0] == container:  # remove .tsv file ext before comparing name
+            packages = requests.get(item['download_url']).text.split(',')  # get names of packages from github
             packages = [package.split('=') for package in packages]
 
     containers = []
@@ -283,14 +293,15 @@ def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channe
                 else:
                     containers.append('%s:%s-%s' % (package[0], package[1], build))
                 break
-    
+
     for container in containers:
         tests = test_search(container, recipes_path, deep, anaconda_channel, github_repo)
         package_tests['commands'] += tests.get('commands', [])
-        for imp in tests.get('imports', []): # not a very nice solution but probably the simplest
-            package_tests['imports'].append("%s 'import %s'" % (tests['import_lang'], imp)) 
+        for imp in tests.get('imports', []):  # not a very nice solution but probably the simplest
+            package_tests['imports'].append("%s 'import %s'" % (tests['import_lang'], imp))
 
     return package_tests
+
 
 import doctest
 doctest.testmod()

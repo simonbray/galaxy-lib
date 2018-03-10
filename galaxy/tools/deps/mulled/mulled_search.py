@@ -30,6 +30,7 @@ except ImportError:
 
 QUAY_API_URL = 'https://quay.io/api/v1/repository'
 
+
 class QuaySearch():
     """
     Tool to search within a quay organization for a given software name.
@@ -73,7 +74,7 @@ class QuaySearch():
         Search Docker containers on quay.io.
         Results are displayed with all available versions,
         including the complete image name.
-        
+
         """
         # with statement closes searcher after usage.
         with self.index.searcher() as searcher:
@@ -97,7 +98,7 @@ class QuaySearch():
             for result in results:
                 title = result['title']
                 for version in self.get_additional_repository_information(title):
-                    out.append({'package': title, 'version': version,})
+                    out.append({'package': title, 'version': version, })
 
             return out
 
@@ -113,13 +114,14 @@ class QuaySearch():
         decoded_request = json_decoder.decode(r.text)
         return decoded_request['tags']
 
+
 class CondaSearch():
     """
     Tool to search the bioconda channel
 
 
     >>> t = CondaSearch('bioconda')
-    
+
     >>> t.get_json("adsfasdf")
     []
     >>> {'version': u'2.2.0', 'build': u'0', 'package': u'bioconductor-gosemsim'} in t.get_json("bioconductor-gosemsim")
@@ -139,6 +141,7 @@ class CondaSearch():
             logging.info('Search failed with: %s' % err)
             return []
         return [{'package': n.split()[0], 'version': n.split()[1], 'build': n.split()[2]} for n in raw_out.split('\n')[2:-1]]
+
 
 class GitHubSearch():
     """
@@ -166,8 +169,8 @@ class GitHubSearch():
         Function takes JSON input and processes it, returning the required data
         """
 
-        json = json['items'][0:10] #get top ten results
-        
+        json = json['items'][0:10]  # get top ten results
+
         results = []
 
         for result in json:
@@ -177,7 +180,7 @@ class GitHubSearch():
     def recipe_present(self, search_string):
         """
         Checks if a recipe exists in bioconda-recipes which matches search_string exactly
-        
+
         >>> t = GitHubSearch()
         >>> t.recipe_present("bioconductor-gosemsim")
         True
@@ -197,45 +200,47 @@ class GitHubSearch():
 
         return recipe_present
 
+
 def get_package_hash(packages, versions):
     """
     Takes packages and versions (if the latter are given) and returns a hash for each. Also checks github to see if the container is already present.
-    
+
     >>> get_package_hash(['bamtools', 'samtools'], {})
     {'container_present': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
     >>> get_package_hash(['bamtools', 'samtools'], {'bamtools':'2.4.0', 'samtools':'1.3.1'})
     {'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'container_present_with_version': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
     >>> get_package_hash(['abricate', 'abyss'], {'abricate': '0.4', 'abyss': '2.0.1'})
     {'container_present': False, 'version_hash': 'e21d1262f064e1e01b6b9fad5bea117928f31b38', 'package_hash': 'mulled-v2-cde36934a4704f448af44bf01deeae8d2832ca2e'}
-    
+
     """
 
     hash_results = {}
     targets = []
-    if versions: 
+    if versions:
         for p in packages:
             targets.append(build_target(p, version=versions[p]))
-    else: #if versions are not given only calculate the package hash
+    else:  # if versions are not given only calculate the package hash
         for p in packages:
             targets.append(build_target(p))
-    package_hash = v2_image_name(targets) #make the hash from the processed targets
+    package_hash = v2_image_name(targets)  # make the hash from the processed targets
     hash_results['package_hash'] = package_hash.split(':')[0]
     if versions:
         hash_results['version_hash'] = package_hash.split(':')[1]
     try:
         r = json.loads(urllib2.urlopen("https://quay.io/api/v1/repository/biocontainers/%s" % hash_results['package_hash']).read())
     except urllib2.HTTPError:
-        hash_results['container_present'] = False # page could not be retrieved so container not present
+        hash_results['container_present'] = False  # page could not be retrieved so container not present
     else:
         hash_results['container_present'] = True
-        if versions: # now test if the version hash is listed in the repository tags
-            tags = [n[:-2] for n in r['tags']] #remove -0, -1, etc from end of the tag
+        if versions:  # now test if the version hash is listed in the repository tags
+            tags = [n[:-2] for n in r['tags']]  # remove -0, -1, etc from end of the tag
             if hash_results['version_hash'] in tags:
                 hash_results['container_present_with_version'] = True
             else:
                 hash_results['container_present_with_version'] = False
 
     return hash_results
+
 
 def singularity_search(search_string):
     """
@@ -258,31 +263,32 @@ def singularity_search(search_string):
 
     return results
 
-def readable_output(json):
 
-    if sum([len(json[destination][results]) for destination in json for results in json[destination]]) == 0: #if json is empty:
+def readable_output(json, organization='biocontainers', channel='bioconda'):
+
+    if sum([len(json[destination][results]) for destination in json for results in json[destination]]) == 0:  # if json is empty:
         sys.stdout.write('No results found for that query.\n')
         return
 
     # return results for quay, conda and singularity together
-    if sum([len(json[destination][results]) for destination in ['quay', 'conda', 'singularity',] for results in json.get(destination, [])]) > 0:
+    if sum([len(json[destination][results]) for destination in ['quay', 'conda', 'singularity', ] for results in json.get(destination, [])]) > 0:
         sys.stdout.write("The query returned the following result(s).\n")
-        lines = [['LOCATION', 'NAME', 'VERSION', 'COMMAND\n']] # put quay, conda etc results as lists in lines
+        lines = [['LOCATION', 'NAME', 'VERSION', 'COMMAND\n']]  # put quay, conda etc results as lists in lines
         for search_string, results in json.get('quay', {}).items():
             for result in results:
-                lines.append(['quay', result['package'], result['version'], 'docker pull quay.io/biocontainers/%s:%s\n' % (result['package'], result['version'])]) # NOT a real solution
+                lines.append(['quay', result['package'], result['version'], 'docker pull quay.io/%s/%s:%s\n' % (organization, result['package'], result['version'])])  # NOT a real solution
         for search_string, results in json.get('conda', {}).items():
             for result in results:
-                lines.append(['conda', result['package'], '%s--%s' % (result['version'], result['build']), 'conda install -c bioconda %s=%s=%s\n' % (result['package'], result['version'], result['build'])])
+                lines.append(['conda', result['package'], '%s--%s' % (result['version'], result['build']), 'conda install -c %s %s=%s=%s\n' % (channel, result['package'], result['version'], result['build'])])
         for search_string, results in json.get('singularity', {}).items():
             for result in results:
                 lines.append(['singularity', result['package'], result['version'], 'wget https://depot.galaxyproject.org/singularity/%s:%s\n' % (result['package'], result['version'])])
 
-        col_width0, col_width1, col_width2 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1, 2)) # def max col widths for the output
+        col_width0, col_width1, col_width2 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1, 2))  # def max col widths for the output
 
-        #create table
+        # create table
         for line in lines:
-            sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2].ljust(col_width2), line[3]))) #output
+            sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2].ljust(col_width2), line[3])))  # output
 
     if json.get('github_recipe_present', False):
         sys.stdout.write('\n' if 'lines' in locals() else '')
@@ -294,8 +300,7 @@ def readable_output(json):
         col_width0 = max(len(line[0]) for line in lines) + 2
 
         for line in lines:
-            sys.stdout.write("".join((line[0].ljust(col_width0), line[1]))) #output
-
+            sys.stdout.write("".join((line[0].ljust(col_width0), line[1])))  # output
 
     if sum([len(json['github'][results]) for results in json.get('github', [])]) > 0:
         sys.stdout.write('\n' if 'lines' in locals() else '')
@@ -305,10 +310,10 @@ def readable_output(json):
             for result in results:
                 lines.append([search_string, result['name'], 'https://github.com/bioconda/bioconda-recipes/tree/master/%s\n' % result['path']])
 
-        col_width0, col_width1 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1)) # def max col widths for the output
+        col_width0, col_width1 = (max(len(line[n]) for line in lines) + 2 for n in (0, 1))  # def max col widths for the output
 
         for line in lines:
-            sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2]))) #output
+            sys.stdout.write("".join((line[0].ljust(col_width0), line[1].ljust(col_width1), line[2])))  # output
 
 
 def main(argv=None):
@@ -331,10 +336,10 @@ def main(argv=None):
                         help='The name of the tool(s) to search for.')
 
     args = parser.parse_args()
-    json_results = {dest: None for dest in args.search_dest}
+    json_results = {dest: {} for dest in args.search_dest}
     versions = {}
 
-    if len(args.search) > 1: # get hash if multiple packages are searched
+    if len(args.search) > 1:  # get hash if multiple packages are searched
         args.search.append(get_package_hash(args.search, versions)['package_hash'])
 
     if 'conda' in args.search_dest:
@@ -355,10 +360,9 @@ def main(argv=None):
             github_results[item] = github.process_json(github_json, item)
             if github.recipe_present(item):
                 github_recipe_present.append(item)
-        
+
         json_results['github'] = github_results
         json_results['github_recipe_present'] = {'recipes': github_recipe_present}
-
 
     if 'quay' in args.search_dest:
         quay_results = {}
@@ -367,7 +371,7 @@ def main(argv=None):
 
         for item in args.search:
             quay_results[item] = quay.search_repository(item, args.non_strict)
-            
+
         json_results['quay'] = quay_results
 
     if 'singularity' in args.search_dest:
@@ -375,14 +379,15 @@ def main(argv=None):
         for item in args.search:
             singularity_results[item] = singularity_search(item)
         json_results['singularity'] = singularity_results
-    
+
     if args.json:
         print(json_results)
     else:
-        readable_output(json_results)
+        readable_output(json_results, args.organization_string, args.channel_string)
+
 
 if __name__ == "__main__":
-    main()
+    # main()
 
-    # import doctest
-    # doctest.testmod()
+    import doctest
+    doctest.testmod()

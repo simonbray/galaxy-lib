@@ -6,6 +6,7 @@ import logging
 
 QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 
+
 def get_quay_containers(repository='biocontainers'):
     """
     Gets all quay containers in the biocontainers repo
@@ -35,6 +36,7 @@ def get_quay_containers(repository='biocontainers'):
 
     return containers
 
+
 def get_singularity_containers():
     """
     Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
@@ -50,8 +52,9 @@ def get_singularity_containers():
     tree = html.fromstring(index.content)
     containers = tree.xpath('//a/@href')
     containers = [container.replace('%3A', ':') for container in containers]
-    containers.remove('../') # remove the first line of the html page which is not a container
+    containers.remove('../')  # remove the first line of the html page which is not a container
     return containers
+
 
 def get_conda_envs(filepath):
     """
@@ -90,7 +93,6 @@ def get_missing_envs(quay_list, conda_list, blacklist_file=None):
     >>> get_missing_envs(quay_list=['1', '2', '3', 'h--1', 'g--2', 'r'], conda_list=['3', '4', '5'], blacklist_file=blacklist.name)
     ['1', '2', 'h--1']
     """
-    list_to_return = []
     blacklist = []
     if blacklist_file:
         blacklist = open(blacklist_file).read().split('\n')
@@ -106,9 +108,9 @@ def main():
                         help="Exclude Docker containers from which Singularity containers have already been built.")
     parser.add_argument('--not-conda', dest='not_conda', action="store_true",
                         help="Exclude Docker containers from which Conda environments have already been extracted.")
-    parser.add_argument('--conda-filepath', dest='conda_filepath', default=None, 
+    parser.add_argument('--conda-filepath', dest='conda_filepath', default=None,
                         help="If searching for conda environments or employing the --not-conda option, a filepath where the environments are located.")
-    parser.add_argument('-b', '--blacklist', dest='blacklist', default=None, 
+    parser.add_argument('-b', '--blacklist', dest='blacklist', default=None,
                         help="Provide a 'blacklist file' containing containers which should be excluded from the list.")
     parser.add_argument('-f', '--file', dest='output', default=None,
                         help="File to write list to. If not given output will be returned on the command line.")
@@ -136,5 +138,9 @@ def main():
     else:
         print(containers)
 
+
 if __name__ == '__main__':
-    main()
+    # main()
+
+    import doctest
+    doctest.testmod()

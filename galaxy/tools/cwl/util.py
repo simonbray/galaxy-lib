@@ -385,4 +385,3 @@ def output_to_cwl_json(
         return rval
     else:
         raise NotImplementedError("Unknown history content type encountered")
-        

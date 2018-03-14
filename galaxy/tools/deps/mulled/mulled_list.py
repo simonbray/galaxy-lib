@@ -3,7 +3,7 @@
 import argparse
 
 import requests
-from lxml import html
+from HTMLParser import HTMLParser
 import logging
 from glob import glob
 
@@ -50,16 +50,23 @@ def get_singularity_containers():
     True
     >>> 'znc:latest' in lst
     False
-
     """
-    index_url = "https://depot.galaxyproject.org/singularity/"
-    index = requests.get(index_url)
-    tree = html.fromstring(index.content)
-    containers = tree.xpath('//a/@href')
-    containers = [container.replace('%3A', ':') for container in containers]
-    # remove the first line of the html page which is not a container
-    containers.remove('../')
-    return containers
+    class GetContainerNames(HTMLParser): # small parser which gets list of containers
+        def __init__(self):
+            HTMLParser.__init__(self)
+            self.containers = []
+        def handle_starttag(self, tag, attrs):
+            try:
+                for attr in attrs:
+                    if attr[0] == 'href' and attr[1] != '../':
+                        self.containers.append(attr[1].replace('%3A', ':'))
+            except IndexError:
+                pass
+
+    parser = GetContainerNames()
+    index = requests.get("https://depot.galaxyproject.org/singularity/")
+    parser.feed(index.content)
+    return parser.containers
 
 
 def get_conda_envs(filepath):
@@ -79,7 +86,7 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
 
     >>> import tempfile
     >>> blacklist = tempfile.NamedTemporaryFile(delete=False)
-    >>> blacklist.write('l\\n\\ng\\nn\\nr')
+    >>> blacklist.write('l\n\ng\nn\nr')
     >>> blacklist.close()
     >>> get_missing_containers(quay_list=['1', '2', '3', 'h', 'g', 'r'], singularity_list=['3', '4', '5'], blacklist_file=blacklist.name)
     ['1', '2', 'h']

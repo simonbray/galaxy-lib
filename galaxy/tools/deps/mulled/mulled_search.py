@@ -7,11 +7,13 @@ import tempfile
 import urllib2
 import logging
 
-from conda.cli.python_api import run_command
-
 from mulled_list import get_singularity_containers
-from util import build_target, v2_image_name
+from galaxy.tools.deps.mulled.util import build_target, v2_image_name
 
+try:
+    from conda.cli.python_api import run_command
+except ImportError:
+    run_command = None
 try:
     import requests
 except ImportError:
@@ -340,7 +342,7 @@ def readable_output(json, organization='biocontainers', channel='bioconda'):
 
 
 def main(argv=None):
-    if Schema == None:
+    if Schema is None:
         sys.stdout.write(
             "Required dependencies are not installed. Run 'pip install Whoosh'.\n")
         return

@@ -6,7 +6,7 @@ from subprocess import check_output
 import argparse
 from glob import glob
 
-from get_tests import hashed_test_search, test_search
+from galaxy.tools.deps.mulled.get_tests import hashed_test_search, test_search
 
 
 def get_list_from_file(filename):
@@ -31,7 +31,7 @@ def docker_to_singularity(container, installation, filepath, no_sudo=False):
     >>> os.mkdir('/tmp/singtest')
     >>> glob('/tmp/singtest/abundancebin:1.0.1--0')
     []
-    >>> docker_to_singularity('abundancebin:1.0.1--0', 'singularity', '/tmp/singtest', no_sudo=True)
+    >>> docker_to_singularity('abundancebin:1.0.1--0', '/home/travis/build/galaxyproject/galaxy-lib/singularity', '/tmp/singtest', no_sudo=True)
     >>> glob('/tmp/singtest/abundancebin:1.0.1--0')
     ['/tmp/singtest/abundancebin:1.0.1--0']
     >>> shutil.rmtree('/tmp/singtest')
@@ -57,8 +57,8 @@ def test_singularity_container(tests, installation, filepath):
     >>> import os, shutil
     >>> os.mkdir('/tmp/singtest')
     >>> for n in ['pybigwig:0.1.11--py36_0', 'samtools:1.6--0', 'yasm:1.3.0--0']:
-    ...     docker_to_singularity(n, 'singularity', '/tmp/singtest', no_sudo=True)
-    >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}}, 'singularity', '/tmp/singtest')
+    ...     docker_to_singularity(n, '/home/travis/build/galaxyproject/galaxy-lib/singularity', '/tmp/singtest', no_sudo=True)
+    >>> results = test_singularity_container({'pybigwig:0.1.11--py36_0': {'imports': ['pyBigWig'], 'commands': ['python -c "import pyBigWig; assert(pyBigWig.numpy == 1); assert(pyBigWig.remote == 1)"'], 'import_lang': 'python -c'}, 'samtools:1.6--0': {'commands': ['samtools --help'], 'import_lang': 'python -c', 'container': 'samtools:1.6--0'}, 'yasm:1.3.0--0': {}}, '/home/travis/build/galaxyproject/galaxy-lib/singularity', '/tmp/singtest')
     >>> 'samtools:1.6--0' in results['passed']
     True
     >>> results['failed'][0]['imports'] == ['pyBigWig']

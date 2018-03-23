@@ -208,6 +208,7 @@ def v2_image_name(targets, image_build=None, name_override=None):
             suffix = ":%s%s" % (version_hash_str, build_suffix)
         return "mulled-v2-%s%s" % (package_hash.hexdigest(), suffix)
 
+
 def split_container_name(name):
     """
     Takes a container name (e.g. samtools:1.7--1) and returns a list (e.g. ['samtools', '1.7', '1'])
@@ -215,6 +216,7 @@ def split_container_name(name):
     ['samtools', '1.7', '1']
     """
     return name.replace('--', ':').split(':')
+
 
 class PrintProgress(object):
     def __init__(self):
@@ -252,4 +254,3 @@ __all__ = (
     "version_sorted",
     "split_container_name",
 )
-

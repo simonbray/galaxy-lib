@@ -10,7 +10,7 @@ from galaxy.tools.deps.mulled.get_tests import hashed_test_search, test_search
 
 
 def get_list_from_file(filename):
-    """
+    r"""
     Returns a list of containers stored in a file (one on each line)
     >>> from os import remove
     >>> with open('/tmp/list_file.txt', 'w') as f:
@@ -38,11 +38,9 @@ def docker_to_singularity(container, installation, filepath, no_sudo=False):
 
     try:
         if no_sudo:
-            check_output("%s build %s/%s docker://quay.io/biocontainers/%s" % (installation,
-                                                                               filepath, container, container), stderr=subprocess.STDOUT, shell=True)
+            check_output("%s build %s/%s docker://quay.io/biocontainers/%s" % (installation, filepath, container, container), stderr=subprocess.STDOUT, shell=True)
         else:
-            check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" %
-                         (installation, filepath, container, container), stderr=subprocess.STDOUT, shell=True)
+            check_output("sudo %s build %s/%s docker://quay.io/biocontainers/%s && sudo rm -rf /root/.singularity/docker/" % (installation, filepath, container, container), stderr=subprocess.STDOUT, shell=True)
     except subprocess.CalledProcessError as e:
         error_info = {'code': e.returncode, 'cmd': e.cmd, 'out': e.output}
         return error_info

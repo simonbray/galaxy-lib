@@ -22,15 +22,15 @@ from galaxy.tools.deps.mulled.util import split_container_name
 def get_commands_from_yaml(file):
     """
     Gets tests from a yaml file
-    >>> get_commands_from_yaml('{% set name = "eagle" %}\\n\\npackage:\\n  name: \\'{{ name }}\\'\\n\\nrequirements:\\n  run:\\n    - python\\n    - flask\\n\\ntest:\\n  imports:\\n    - eagle\\n  commands:\\n    - eagle --help')
+    >>> get_commands_from_yaml(b'{% set name = "eagle" %}\\n\\npackage:\\n  name: \\'{{ name }}\\'\\n\\nrequirements:\\n  run:\\n    - python\\n    - flask\\n\\ntest:\\n  imports:\\n    - eagle\\n  commands:\\n    - eagle --help')
     {'imports': ['eagle'], 'commands': ['eagle --help'], 'import_lang': 'python -c'}
     """
     package_tests = {}
 
     try:
-        # run the file through the jinja processing
-        meta_yaml = yaml.load(Template(file).render())
-    except yaml.scanner.ScannerError:   # should not occur due to the above
+        # we expect to get an input in bytes, so first decode to string; run the file through the jinja processing; load as yaml
+        meta_yaml = yaml.load(Template(file.decode('utf-8')).render())
+    except yaml.scanner.ScannerError:
         logging.info('ScannerError')
         return None
     try:
@@ -272,7 +272,7 @@ def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channe
 
     githubpage = requests.get('https://raw.githubusercontent.com/BioContainers/multi-package-containers/master/combinations/%s.tsv' % container)
     if githubpage.status_code == 200:
-        packages = githubpage.content.split(',')  # get names of packages from github
+        packages = githubpage.text.split(',')  # get names of packages from github
         packages = [package.split('=') for package in packages]
     else:
         packages = []

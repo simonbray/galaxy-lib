@@ -52,7 +52,7 @@ def get_singularity_containers():
     """
     Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
     >>> lst = get_singularity_containers()
->>> 'aragorn:1.2.36--1' in lst
+    >>> 'aragorn:1.2.36--1' in lst
     True
     >>> 'znc:latest' in lst
     False
@@ -72,7 +72,7 @@ def get_singularity_containers():
 
     parser = GetContainerNames()
     index = requests.get("https://depot.galaxyproject.org/singularity/")
-    parser.feed(index.content)
+    parser.feed(index.text)
     return parser.containers
 
 
@@ -88,12 +88,12 @@ def get_conda_envs(filepath):
 
 
 def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
-    """
+    r"""
     Returns list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
     >>> from os import remove
     >>> with open('/tmp/blacklist.txt', 'w') as f:
     ...     f.write('l\n\ng\nn\nr')
-    >>> get_missing_containers(quay_list=['1', '2', '3', 'h', 'g', 'r'], singularity_list=['3', '4', '5'], blacklist_file='/tmp/blacklist')
+    >>> get_missing_containers(quay_list=['1', '2', '3', 'h', 'g', 'r'], singularity_list=['3', '4', '5'], blacklist_file='/tmp/blacklist.txt')
     ['1', '2', 'h']
     >>> remove('/tmp/blacklist.txt')
     """
@@ -104,7 +104,7 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
 
 
 def get_missing_envs(quay_list, conda_list, blacklist_file=None):
-    """
+    r"""
     >>> from os import remove
     >>> with open('/tmp/blacklist.txt', 'w') as f:
     ...     f.write('l\n\ng\nn\nr')

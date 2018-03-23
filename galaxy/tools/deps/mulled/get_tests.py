@@ -5,16 +5,16 @@ searches for tests for packages in the bioconda-recipes repo and on Anaconda, lo
 
 A shallow search (default for singularity and conda generation scripts) just checks once on Anaconda for the specified version.
 """
-import json
-import tarfile
-import logging
 import doctest
+import json
+import logging
+import tarfile
 from glob import glob
 from io import BytesIO
 
 import requests
-from jinja2 import Template
 import yaml
+from jinja2 import Template
 
 from galaxy.tools.deps.mulled.util import split_container_name
 
@@ -30,7 +30,7 @@ def get_commands_from_yaml(file):
     try:
         # run the file through the jinja processing
         meta_yaml = yaml.load(Template(file).render())
-    except ScannerError:   # should not occur due to the above
+    except yaml.scanner.ScannerError:   # should not occur due to the above
         logging.info('ScannerError')
         return None
     try:
@@ -270,13 +270,12 @@ def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channe
     """
     package_tests = {'commands': [], 'imports': [], 'container': container, 'import_lang': 'python -c'}
 
-    github_hashes = json.loads(requests.get('https://api.github.com/repos/BioContainers/multi-package-containers/contents/combinations/').text)
-    packages = []
-    for item in github_hashes:  # check if the container name is in the github repo
-        # remove .tsv file ext before comparing name
-        if item['name'].split('.')[0] == container:
-            packages = requests.get(item['download_url']).text.split(',')  # get names of packages from github
-            packages = [package.split('=') for package in packages]
+    githubpage = requests.get('https://raw.githubusercontent.com/BioContainers/multi-package-containers/master/combinations/%s.tsv' % container)
+    if githubpage.status_code == 200:
+        packages = githubpage.content.split(',')  # get names of packages from github
+        packages = [package.split('=') for package in packages]
+    else:
+        packages = []
 
     containers = []
     for package in packages:
@@ -294,7 +293,7 @@ def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channe
 
     for container in containers:
         tests = test_search(container, recipes_path, deep, anaconda_channel, github_repo)
-        package_tests['commands'] += tests.get('commands', []) # not a very nice solution but probably the simplest
+        package_tests['commands'] += tests.get('commands', [])  # not a very nice solution but probably the simplest
         for imp in tests.get('imports', []):
             package_tests['imports'].append("%s 'import %s'" % (tests['import_lang'], imp))
 

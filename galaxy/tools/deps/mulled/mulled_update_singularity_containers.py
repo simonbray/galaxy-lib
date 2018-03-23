@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
+import argparse
 import os
 import subprocess
-from subprocess import check_output
-import argparse
 from glob import glob
+from subprocess import check_output
 
 from galaxy.tools.deps.mulled.get_tests import hashed_test_search, test_search
 
@@ -12,13 +12,12 @@ from galaxy.tools.deps.mulled.get_tests import hashed_test_search, test_search
 def get_list_from_file(filename):
     """
     Returns a list of containers stored in a file (one on each line)
-    >>> import tempfile
-    >>> listfile = tempfile.NamedTemporaryFile(delete=False)
-    >>> listfile.write('bbmap:36.84--0\\nbiobambam:2.0.42--0\\nconnor:0.5.1--py35_0\\ndiamond:0.8.26--0\\nedd:1.1.18--py27_0')
-    >>> listfile.close()
-    >>> get_list_from_file(listfile.name)
+    >>> from os import remove
+    >>> with open('/tmp/list_file.txt', 'w') as f:
+    ...     f.write('bbmap:36.84--0\nbiobambam:2.0.42--0\nconnor:0.5.1--py35_0\ndiamond:0.8.26--0\nedd:1.1.18--py27_0')
+    >>> get_list_from_file('/tmp/list_file.txt')
     ['bbmap:36.84--0', 'biobambam:2.0.42--0', 'connor:0.5.1--py35_0', 'diamond:0.8.26--0', 'edd:1.1.18--py27_0']
-    >>>
+    >>> remove('/tmp/list_file.txt')
     """
     return [n for n in open(filename).read().split('\n') if n is not '']  # if blank lines are in the file empty strings must be removed
 
@@ -88,13 +87,13 @@ def test_singularity_container(tests, installation, filepath):
                     try:
                         check_output("%s exec -H /tmp/sing_home %s/%s bash -c \"%s\"" % (
                             installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
-                    except subprocess.CalledProcessError as e1:
+                    except subprocess.CalledProcessError as e:
                         try:
                             check_output("%s exec -H /tmp/sing_home %s/%s %s" % (
                                 installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
-                        except subprocess.CalledProcessError as e2:
+                        except subprocess.CalledProcessError as e:
                             errors.append(
-                                {'command': command, 'output': e2.output})
+                                {'command': command, 'output': e.output})
                             test_passed = False
 
             if test.get('imports', False):

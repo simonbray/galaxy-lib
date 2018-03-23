@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 
 import argparse
-
-import requests
-from HTMLParser import HTMLParser
 import logging
 from glob import glob
 
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    from html.parser import HTMLParser
+except ImportError:  # python 2
+    from HTMLParser import HTMLParser
 
 QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 
@@ -46,15 +52,16 @@ def get_singularity_containers():
     """
     Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
     >>> lst = get_singularity_containers()
-    >>> 'aragorn:1.2.36--1' in lst
+>>> 'aragorn:1.2.36--1' in lst
     True
     >>> 'znc:latest' in lst
     False
     """
-    class GetContainerNames(HTMLParser): # small parser which gets list of containers
+    class GetContainerNames(HTMLParser):  # small parser which gets list of containers
         def __init__(self):
             HTMLParser.__init__(self)
             self.containers = []
+
         def handle_starttag(self, tag, attrs):
             try:
                 for attr in attrs:
@@ -83,13 +90,12 @@ def get_conda_envs(filepath):
 def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     """
     Returns list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
-
-    >>> import tempfile
-    >>> blacklist = tempfile.NamedTemporaryFile(delete=False)
-    >>> blacklist.write('l\n\ng\nn\nr')
-    >>> blacklist.close()
-    >>> get_missing_containers(quay_list=['1', '2', '3', 'h', 'g', 'r'], singularity_list=['3', '4', '5'], blacklist_file=blacklist.name)
+    >>> from os import remove
+    >>> with open('/tmp/blacklist.txt', 'w') as f:
+    ...     f.write('l\n\ng\nn\nr')
+    >>> get_missing_containers(quay_list=['1', '2', '3', 'h', 'g', 'r'], singularity_list=['3', '4', '5'], blacklist_file='/tmp/blacklist')
     ['1', '2', 'h']
+    >>> remove('/tmp/blacklist.txt')
     """
     blacklist = []
     if blacklist_file:
@@ -99,11 +105,10 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
 
 def get_missing_envs(quay_list, conda_list, blacklist_file=None):
     """
-    >>> import tempfile
-    >>> blacklist = tempfile.NamedTemporaryFile(delete=False)
-    >>> blacklist.write('l\\n\\ng\\nn\\nr')
-    >>> blacklist.close()
-    >>> get_missing_envs(quay_list=['1', '2', '3', 'h--1', 'g--2', 'r'], conda_list=['3', '4', '5'], blacklist_file=blacklist.name)
+    >>> from os import remove
+    >>> with open('/tmp/blacklist.txt', 'w') as f:
+    ...     f.write('l\n\ng\nn\nr')
+    >>> get_missing_envs(quay_list=['1', '2', '3', 'h--1', 'g--2', 'r'], conda_list=['3', '4', '5'], blacklist_file='/tmp/blacklist.txt')
     ['1', '2', 'h--1']
     """
     blacklist = []

@@ -2,12 +2,13 @@
 
 import argparse
 import json
+import logging
 import sys
 import tempfile
 import urllib2
-import logging
 
-from mulled_list import get_singularity_containers
+from galaxy.tools.deps.mulled.mulled_list import get_singularity_containers
+
 from galaxy.tools.deps.mulled.util import build_target, v2_image_name
 
 try:

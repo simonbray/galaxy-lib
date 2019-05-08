@@ -15,6 +15,7 @@ from io import BytesIO
 import requests
 import yaml
 from jinja2 import Template
+from jinja2.exceptions import UndefinedError
 
 from galaxy.tools.deps.mulled.util import split_container_name
 
@@ -22,16 +23,16 @@ from galaxy.tools.deps.mulled.util import split_container_name
 def get_commands_from_yaml(file):
     """
     Gets tests from a yaml file
-    >>> get_commands_from_yaml(b'{% set name = "eagle" %}\\n\\npackage:\\n  name: \\'{{ name }}\\'\\n\\nrequirements:\\n  run:\\n    - python\\n    - flask\\n\\ntest:\\n  imports:\\n    - eagle\\n  commands:\\n    - eagle --help')
-    {'imports': ['eagle'], 'commands': ['eagle --help'], 'import_lang': 'python -c'}
+    >>> get_commands_from_yaml(b'{% set name = "eagle" %}\\n\\npackage:\\n  name: \\'{{ name }}\\'\\n\\nrequirements:\\n  run:\\n    - python\\n    - flask\\n\\ntest:\\n  imports:\\n    - eagle\\n  commands:\\n    - eagle --help') == {'imports': ['eagle'], 'commands': ['eagle --help'], 'import_lang': 'python -c'}
+    True
     """
     package_tests = {}
 
     try:
         # we expect to get an input in bytes, so first decode to string; run the file through the jinja processing; load as yaml
-        meta_yaml = yaml.load(Template(file.decode('utf-8')).render())
-    except yaml.scanner.ScannerError:
-        logging.info('ScannerError')
+        meta_yaml = yaml.load(Template(file.decode('utf-8')).render(), Loader=yaml.SafeLoader)
+    except (yaml.scanner.ScannerError, UndefinedError) as e: # what about things like {{ compiler('cxx') }}
+        logging.info(e)
         return None
     try:
         if meta_yaml['test']['commands'] != [None] and meta_yaml['test']['commands'] is not None:
@@ -141,8 +142,8 @@ def get_test_from_anaconda(url):
 def find_anaconda_versions(name, anaconda_channel='bioconda'):
     """
     Finds a list of available anaconda versions for a given container name
-    >>> find_anaconda_versions('2pg_cartesian')
-    [u'/bioconda/2pg_cartesian/1.0.1/download/linux-64/2pg_cartesian-1.0.1-0.tar.bz2']
+    >>> u'/bioconda/2pg_cartesian/1.0.1/download/linux-64/2pg_cartesian-1.0.1-0.tar.bz2' in find_anaconda_versions('2pg_cartesian')
+    True
     """
     r = requests.get("https://anaconda.org/%s/%s/files" % (anaconda_channel, name))
     urls = []
@@ -155,17 +156,17 @@ def find_anaconda_versions(name, anaconda_channel='bioconda'):
 def open_recipe_file(file, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
     """
     Opens a file at a particular location and returns contents as string
-    >>> open_recipe_file('recipes/samtools/1.0/meta.yaml')
-    u'about:\\n  home: https://github.com/samtools/samtools\\n  license: MIT\\n  summary: Tools for dealing with SAM, BAM and CRAM files\\n\\nbuild:\\n  number: 1\\n\\npackage:\\n  name: samtools\\n  version: \\'1.0\\'\\n\\nrequirements:\\n  build:\\n  - ncurses {{CONDA_NCURSES}}*\\n  - zlib {{CONDA_ZLIB}}*\\n  run:\\n  - ncurses {{CONDA_NCURSES}}*\\n  - zlib {{CONDA_ZLIB}}*\\n\\nsource:\\n  fn: samtools-1.0.tar.bz2\\n  sha256: 7340b843663c3f54a902a06f2f73c68198f3a62d29a2ed20671139957f7fd7c0\\n  url: http://downloads.sourceforge.net/project/samtools/samtools/1.0/samtools-1.0.tar.bz2\\n\\ntest:\\n  commands:\\n    - "samtools view --help 2>&1 | grep Notes > /dev/null"\\n'
+    >>> open_recipe_file('recipes/samtools/1.1/meta.yaml')[:5] == b'about'
+    True
     """
     if recipes_path:
         return open('%s/%s' % (recipes_path, file)).read()
     else:  # if no clone of the repo is available locally, download from GitHub
         r = requests.get('https://raw.githubusercontent.com/%s/master/%s' % (github_repo, file))
         if r.status_code == 404:
-            raise IOError
+            raise OSError
         else:
-            return r.text
+            return r.content
 
 
 def get_alternative_versions(filepath, filename, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
@@ -265,7 +266,7 @@ def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channe
     """
     Gets test for hashed containers
     >>> t = hashed_test_search('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0')
-    >>> t == {'commands': ['bamtools --help', 'samtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
+    >>> t == {'commands': ['bamtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
     True
     """
     package_tests = {'commands': [], 'imports': [], 'container': container, 'import_lang': 'python -c'}

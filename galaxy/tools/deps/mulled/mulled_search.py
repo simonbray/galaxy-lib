@@ -5,7 +5,7 @@ import json
 import logging
 import sys
 import tempfile
-import urllib2
+import requests
 
 from galaxy.tools.deps.mulled.mulled_list import get_singularity_containers
 from galaxy.tools.deps.mulled.util import build_target, v2_image_name
@@ -124,8 +124,7 @@ class CondaSearch():
 
 
     >>> t = CondaSearch('bioconda')
-
-    >>> t.get_json("adsfasdf")
+    >>> t.get_json("asdfasdf")
     []
     >>> {'version': u'2.2.0', 'build': u'0', 'package': u'bioconductor-gosemsim'} in t.get_json("bioconductor-gosemsim")
     True
@@ -140,7 +139,10 @@ class CondaSearch():
 
         """
         raw_out, err, exit_code = run_command(
-            'search', '-c %s %s' % (self.channel, search_string), use_exception_handler=True)
+            'search', '-c', 
+            self.channel, 
+            search_string, 
+            use_exception_handler=True)
         if exit_code != 0:
             logging.info('Search failed with: %s' % err)
             return []
@@ -165,8 +167,8 @@ class GitHubSearch():
         """
         Function takes search_string variable and returns results from the bioconda-recipes github repository in JSON format
         """
-        response = json.loads(urllib2.urlopen(
-            "https://api.github.com/search/code?q=%s+in:path+repo:bioconda/bioconda-recipes+path:recipes" % search_string).read())
+        response = requests.get(
+            "https://api.github.com/search/code?q=%s+in:path+repo:bioconda/bioconda-recipes+path:recipes" % search_string).json()
         return response
 
     def process_json(self, json, search_string):
@@ -197,27 +199,23 @@ class GitHubSearch():
         False
 
         """
-        try:
-            json.loads(urllib2.urlopen(
-                "https://api.github.com/repos/bioconda/bioconda-recipes/contents/recipes/%s" % search_string).read())
-            recipe_present = True
-        except urllib2.HTTPError:
-            recipe_present = False
 
-        return recipe_present
+        if requests.get("https://api.github.com/repos/bioconda/bioconda-recipes/contents/recipes/%s" % search_string).status_code == 200:
+            return True
+        else:
+            return False
 
 
 def get_package_hash(packages, versions):
     """
     Takes packages and versions (if the latter are given) and returns a hash for each. Also checks github to see if the container is already present.
 
-    >>> get_package_hash(['bamtools', 'samtools'], {})
-    {'container_present': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
-    >>> get_package_hash(['bamtools', 'samtools'], {'bamtools':'2.4.0', 'samtools':'1.3.1'})
-    {'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'container_present_with_version': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
-    >>> get_package_hash(['abricate', 'abyss'], {'abricate': '0.4', 'abyss': '2.0.1'})
-    {'container_present': False, 'version_hash': 'e21d1262f064e1e01b6b9fad5bea117928f31b38', 'package_hash': 'mulled-v2-cde36934a4704f448af44bf01deeae8d2832ca2e'}
-
+    >>> get_package_hash(['bamtools', 'samtools'], {}) == {'container_present': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
+    True
+    >>> get_package_hash(['bamtools', 'samtools'], {'bamtools':'2.4.0', 'samtools':'1.3.1'}) == {'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'container_present_with_version': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
+    True
+    >>> get_package_hash(['abricate', 'abyss'], {'abricate': '0.4', 'abyss': '2.0.1'}) == {'container_present': False, 'version_hash': 'e21d1262f064e1e01b6b9fad5bea117928f31b38', 'package_hash': 'mulled-v2-cde36934a4704f448af44bf01deeae8d2832ca2e'}
+    True
     """
 
     hash_results = {}
@@ -233,22 +231,19 @@ def get_package_hash(packages, versions):
     hash_results['package_hash'] = package_hash.split(':')[0]
     if versions:
         hash_results['version_hash'] = package_hash.split(':')[1]
-    try:
-        r = json.loads(urllib2.urlopen(
-            "https://quay.io/api/v1/repository/biocontainers/%s" % hash_results['package_hash']).read())
-    except urllib2.HTTPError:
-        # page could not be retrieved so container not present
-        hash_results['container_present'] = False
-    else:
+
+    r = requests.get("https://quay.io/api/v1/repository/biocontainers/%s" % hash_results['package_hash'])
+    if r.status_code == 200:
         hash_results['container_present'] = True
         if versions:  # now test if the version hash is listed in the repository tags
             # remove -0, -1, etc from end of the tag
-            tags = [n[:-2] for n in r['tags']]
+            tags = [n[:-2] for n in r.json()['tags']]
             if hash_results['version_hash'] in tags:
                 hash_results['container_present_with_version'] = True
             else:
                 hash_results['container_present_with_version'] = False
-
+    else:
+        hash_results['container_present'] = False
     return hash_results
 
 

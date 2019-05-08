@@ -21,7 +21,7 @@ def get_quay_containers(repository='biocontainers'):
     """
     Gets all quay containers in the biocontainers repo
     >>> lst = get_quay_containers()
-    >>> 'samtools:latest' in lst
+    >>> 'samtools:1.0--1' in lst
     True
     >>> 'abricate:0.4--pl5.22.0_0' in lst
     True
@@ -93,6 +93,7 @@ def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     >>> from os import remove
     >>> with open('/tmp/blacklist.txt', 'w') as f:
     ...     f.write('l\n\ng\nn\nr')
+    8
     >>> get_missing_containers(quay_list=['1', '2', '3', 'h', 'g', 'r'], singularity_list=['3', '4', '5'], blacklist_file='/tmp/blacklist.txt')
     ['1', '2', 'h']
     >>> remove('/tmp/blacklist.txt')
@@ -108,6 +109,7 @@ def get_missing_envs(quay_list, conda_list, blacklist_file=None):
     >>> from os import remove
     >>> with open('/tmp/blacklist.txt', 'w') as f:
     ...     f.write('l\n\ng\nn\nr')
+    8
     >>> get_missing_envs(quay_list=['1', '2', '3', 'h--1', 'g--2', 'r'], conda_list=['3', '4', '5'], blacklist_file='/tmp/blacklist.txt')
     ['1', '2', 'h--1']
     """

@@ -19,7 +19,7 @@ def get_list_from_file(filename):
     ['bbmap:36.84--0', 'biobambam:2.0.42--0', 'connor:0.5.1--py35_0', 'diamond:0.8.26--0', 'edd:1.1.18--py27_0']
     >>> remove('/tmp/list_file.txt')
     """
-    return [n for n in open(filename).read().split('\n') if n is not '']  # if blank lines are in the file empty strings must be removed
+    return [n for n in open(filename).read().split('\n') if n != '']  # if blank lines are in the file empty strings must be removed
 
 
 def docker_to_singularity(container, installation, filepath, no_sudo=False):

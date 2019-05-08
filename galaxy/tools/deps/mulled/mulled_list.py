@@ -19,7 +19,7 @@ QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 
 def get_quay_containers(repository='biocontainers'):
     """
-    Gets all quay containers in the biocontainers repo
+    Get all quay containers in the biocontainers repo
     >>> lst = get_quay_containers()
     >>> 'samtools:1.0--1' in lst
     True
@@ -50,7 +50,7 @@ def get_quay_containers(repository='biocontainers'):
 
 def get_singularity_containers():
     """
-    Gets all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
+    Get all existing singularity containers from "https://depot.galaxyproject.org/singularity/"
     >>> lst = get_singularity_containers()
     >>> 'aragorn:1.2.36--1' in lst
     True
@@ -78,18 +78,17 @@ def get_singularity_containers():
 
 def get_conda_envs(filepath):
     """
-    Gets list of already existing envs
+    Get list of already existing envs
     # >>> t = get_conda_envs()
     # >>> 'samtools:latest' in t
     # True
     """
-
     return [n.split('__')[-1].replace('@', ':') for n in glob('%s/*' % filepath)]
 
 
 def get_missing_containers(quay_list, singularity_list, blacklist_file=None):
     r"""
-    Returns list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
+    Return list of quay containers that do not exist as singularity containers. Files stored in a blacklist will be ignored
     >>> from os import remove
     >>> with open('/tmp/blacklist.txt', 'w') as f:
     ...     f.write('l\n\ng\nn\nr')

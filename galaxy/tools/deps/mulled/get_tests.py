@@ -21,8 +21,8 @@ from galaxy.tools.deps.mulled.util import split_container_name
 
 
 def get_commands_from_yaml(file):
-    """
-    Gets tests from a yaml file
+    r"""
+    Get tests from a yaml file
     >>> get_commands_from_yaml(b'{% set name = "eagle" %}\\n\\npackage:\\n  name: \\'{{ name }}\\'\\n\\nrequirements:\\n  run:\\n    - python\\n    - flask\\n\\ntest:\\n  imports:\\n    - eagle\\n  commands:\\n    - eagle --help') == {'imports': ['eagle'], 'commands': ['eagle --help'], 'import_lang': 'python -c'}
     True
     """
@@ -31,7 +31,7 @@ def get_commands_from_yaml(file):
     try:
         # we expect to get an input in bytes, so first decode to string; run the file through the jinja processing; load as yaml
         meta_yaml = yaml.load(Template(file.decode('utf-8')).render(), Loader=yaml.SafeLoader)
-    except (yaml.scanner.ScannerError, UndefinedError) as e: # what about things like {{ compiler('cxx') }}
+    except (yaml.scanner.ScannerError, UndefinedError) as e:  # what about things like {{ compiler('cxx') }}
         logging.info(e)
         return None
     try:
@@ -69,8 +69,8 @@ def get_commands_from_yaml(file):
 
 
 def get_run_test(file):
-    """
-    Gets tests from a run_test.sh file
+    r"""
+    Get tests from a run_test.sh file
     >>> get_run_test(' #!/bin/bash\\npslScore 2> /dev/null || [[ "$?" == 255 ]]')
     {'commands': [' #!/bin/bash && pslScore 2> /dev/null || [[ "$?" == 255 ]]']}
     """
@@ -81,7 +81,7 @@ def get_run_test(file):
 
 def get_anaconda_url(container, anaconda_channel='bioconda'):
     """
-    Downloading tarball from anaconda for test
+    Download tarball from anaconda for test
     >>> get_anaconda_url('samtools:1.7--1')
     'https://anaconda.org/bioconda/samtools/1.7/download/linux-64/samtools-1.7-1.tar.bz2'
     """
@@ -91,7 +91,7 @@ def get_anaconda_url(container, anaconda_channel='bioconda'):
 
 def prepend_anaconda_url(url):
     """
-    Takes a partial url and prepends 'https://anaconda.org'
+    Take a partial url and prepend 'https://anaconda.org'
     >>> prepend_anaconda_url('/bioconda/samtools/0.1.12/download/linux-64/samtools-0.1.12-2.tar.bz2')
     'https://anaconda.org/bioconda/samtools/0.1.12/download/linux-64/samtools-0.1.12-2.tar.bz2'
     """
@@ -100,7 +100,7 @@ def prepend_anaconda_url(url):
 
 def get_test_from_anaconda(url):
     """
-    Given the URL of an anaconda tarball, returns tests
+    Given the URL of an anaconda tarball, return tests
     >>> get_test_from_anaconda('https://anaconda.org/bioconda/samtools/1.3.1/download/linux-64/samtools-1.3.1-5.tar.bz2') == {'commands': ['samtools --help'], 'import_lang': 'python -c'}
     True
     """
@@ -141,7 +141,7 @@ def get_test_from_anaconda(url):
 
 def find_anaconda_versions(name, anaconda_channel='bioconda'):
     """
-    Finds a list of available anaconda versions for a given container name
+    Find a list of available anaconda versions for a given container name
     >>> u'/bioconda/2pg_cartesian/1.0.1/download/linux-64/2pg_cartesian-1.0.1-0.tar.bz2' in find_anaconda_versions('2pg_cartesian')
     True
     """
@@ -155,7 +155,7 @@ def find_anaconda_versions(name, anaconda_channel='bioconda'):
 
 def open_recipe_file(file, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
     """
-    Opens a file at a particular location and returns contents as string
+    Open a file at a particular location and return contents as string
     >>> open_recipe_file('recipes/samtools/1.1/meta.yaml')[:5] == b'about'
     True
     """
@@ -171,7 +171,7 @@ def open_recipe_file(file, recipes_path=None, github_repo='bioconda/bioconda-rec
 
 def get_alternative_versions(filepath, filename, recipes_path=None, github_repo='bioconda/bioconda-recipes'):
     """
-    Returns files that match 'filepath/*/filename' in the bioconda-recipes repository
+    Return files that match 'filepath/*/filename' in the bioconda-recipes repository
     >>> s = get_alternative_versions('recipes/aragorn', 'meta.yaml')
     >>> len(s)
     1
@@ -192,11 +192,11 @@ def get_alternative_versions(filepath, filename, recipes_path=None, github_repo=
 
 def try_a_func(func1, func2, param, container):
     """
-    Tries to perform a function (or actually a combination of two functions: first getting the file and then processing it)
+    Try to perform a function (or actually a combination of two functions: first getting the file and then processing it)
     """
     try:
         result = func1(func2(*param))
-    except IOError:
+    except OSError:
         return None
     if result:
         result['container'] = container
@@ -205,7 +205,7 @@ def try_a_func(func1, func2, param, container):
 
 def deep_test_search(container, recipes_path=None, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
     """
-    Deep search looks in bioconda-recipes repo as well as anaconda for the tests, checking in multiple possible locations. If no test is found for the specified version it also searches if other package versions have a test available.
+    Look in bioconda-recipes repo as well as anaconda for the tests, checking in multiple possible locations. If no test is found for the specified version, search if other package versions have a test available.
     >>> deep_test_search('abundancebin:1.0.1--0') == {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'container': 'abundancebin:1.0.1--0', 'import_lang': 'python -c'}
     True
     """
@@ -245,7 +245,7 @@ def deep_test_search(container, recipes_path=None, anaconda_channel='bioconda', 
 
 def test_search(container, recipes_path=None, deep=False, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
     """
-    Downloading tarball from anaconda for test
+    Download tarball from anaconda for test
     >>> test_search('abundancebin:1.0.1--0') == {'commands': ['command -v abundancebin', 'abundancebin &> /dev/null || [[ "$?" == "255" ]]'], 'import_lang': 'python -c', 'container': 'abundancebin:1.0.1--0'}
     True
     >>> test_search('snakemake:3.11.2--py34_1') == {'commands': ['snakemake --help > /dev/null'], 'imports': ['snakemake'], 'import_lang': 'python -c', 'container': 'snakemake:3.11.2--py34_1'}
@@ -264,7 +264,7 @@ def test_search(container, recipes_path=None, deep=False, anaconda_channel='bioc
 
 def hashed_test_search(container, recipes_path=None, deep=False, anaconda_channel='bioconda', github_repo='bioconda/bioconda-recipes'):
     """
-    Gets test for hashed containers
+    Get test for hashed containers
     >>> t = hashed_test_search('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0')
     >>> t == {'commands': ['bamtools --help'], 'imports': [], 'container': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa:c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0', 'import_lang': 'python -c'}
     True

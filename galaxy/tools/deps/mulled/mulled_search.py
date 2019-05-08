@@ -5,7 +5,6 @@ import json
 import logging
 import sys
 import tempfile
-import requests
 
 from galaxy.tools.deps.mulled.mulled_list import get_singularity_containers
 from galaxy.tools.deps.mulled.util import build_target, v2_image_name
@@ -140,8 +139,8 @@ class CondaSearch():
         """
         raw_out, err, exit_code = run_command(
             'search', '-c', 
-            self.channel, 
-            search_string, 
+            self.channel,
+            search_string,
             use_exception_handler=True)
         if exit_code != 0:
             logging.info('Search failed with: %s' % err)
@@ -165,7 +164,7 @@ class GitHubSearch():
 
     def get_json(self, search_string):
         """
-        Function takes search_string variable and returns results from the bioconda-recipes github repository in JSON format
+        Takes search_string variable and return results from the bioconda-recipes github repository in JSON format
         """
         response = requests.get(
             "https://api.github.com/search/code?q=%s+in:path+repo:bioconda/bioconda-recipes+path:recipes" % search_string).json()
@@ -173,9 +172,8 @@ class GitHubSearch():
 
     def process_json(self, json, search_string):
         """
-        Function takes JSON input and processes it, returning the required data
+        Take JSON input and process it, returning the required data
         """
-
         json = json['items'][0:10]  # get top ten results
 
         results = []
@@ -186,20 +184,15 @@ class GitHubSearch():
 
     def recipe_present(self, search_string):
         """
-        Checks if a recipe exists in bioconda-recipes which matches search_string exactly
-
+        Check if a recipe exists in bioconda-recipes which matches search_string exactly
         >>> t = GitHubSearch()
         >>> t.recipe_present("bioconductor-gosemsim")
         True
-
         >>> t.recipe_present("bioconductor-gosemsi")
         False
-
         >>> t.recipe_present("bioconductor_gosemsim")
         False
-
         """
-
         if requests.get("https://api.github.com/repos/bioconda/bioconda-recipes/contents/recipes/%s" % search_string).status_code == 200:
             return True
         else:
@@ -208,8 +201,7 @@ class GitHubSearch():
 
 def get_package_hash(packages, versions):
     """
-    Takes packages and versions (if the latter are given) and returns a hash for each. Also checks github to see if the container is already present.
-
+    Take packages and versions (if the latter are given) and returns a hash for each. Also checks github to see if the container is already present.
     >>> get_package_hash(['bamtools', 'samtools'], {}) == {'container_present': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
     True
     >>> get_package_hash(['bamtools', 'samtools'], {'bamtools':'2.4.0', 'samtools':'1.3.1'}) == {'container_present': True, 'version_hash': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e', 'container_present_with_version': True, 'package_hash': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa'}
@@ -217,7 +209,6 @@ def get_package_hash(packages, versions):
     >>> get_package_hash(['abricate', 'abyss'], {'abricate': '0.4', 'abyss': '2.0.1'}) == {'container_present': False, 'version_hash': 'e21d1262f064e1e01b6b9fad5bea117928f31b38', 'package_hash': 'mulled-v2-cde36934a4704f448af44bf01deeae8d2832ca2e'}
     True
     """
-
     hash_results = {}
     targets = []
     if versions:
@@ -249,7 +240,7 @@ def get_package_hash(packages, versions):
 
 def singularity_search(search_string):
     """
-    Checks if a singularity package is present and returns the link.
+    Check if a singularity package is present and return the link.
     >>> t = singularity_search('mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa')
     >>> t == [{'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'version': 'c17ce694dd57ab0ac1a2b86bb214e65fedef760e-0'}, {'package': 'mulled-v2-0560a8046fc82aa4338588eca29ff18edab2c5aa', 'version': 'fc33176431a4b9ef3213640937e641d731db04f1-0'}]
     True

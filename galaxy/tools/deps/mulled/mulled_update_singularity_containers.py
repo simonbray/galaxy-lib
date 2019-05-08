@@ -85,7 +85,7 @@ def test_singularity_container(tests, installation, filepath):
                     try:
                         check_output("%s exec -H /tmp/sing_home %s/%s bash -c \"%s\"" % (
                             installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)
-                    except subprocess.CalledProcessError as e:
+                    except subprocess.CalledProcessError:
                         try:
                             check_output("%s exec -H /tmp/sing_home %s/%s %s" % (
                                 installation, filepath, container, command), stderr=subprocess.STDOUT, shell=True)

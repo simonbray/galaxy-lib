@@ -20,13 +20,13 @@ QUAY_API_ENDPOINT = 'https://quay.io/api/v1/repository'
 def get_quay_containers(repository='biocontainers'):
     """
     Get all quay containers in the biocontainers repo
-    >>> lst = get_quay_containers()
-    >>> 'samtools:1.0--1' in lst
-    True
-    >>> 'abricate:0.4--pl5.22.0_0' in lst
-    True
-    >>> 'samtools' in lst
-    False
+        # >>> lst = get_quay_containers()
+        # >>> 'samtools:1.0--1' in lst
+        # True
+        # >>> 'abricate:0.4--pl5.22.0_0' in lst
+        # True
+        # >>> 'samtools' in lst
+        # False
     """
     containers = []
 

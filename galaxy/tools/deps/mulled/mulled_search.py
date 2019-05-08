@@ -138,7 +138,7 @@ class CondaSearch():
 
         """
         raw_out, err, exit_code = run_command(
-            'search', '-c', 
+            'search', '-c',
             self.channel,
             search_string,
             use_exception_handler=True)

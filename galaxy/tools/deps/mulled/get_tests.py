@@ -71,7 +71,7 @@ def get_commands_from_yaml(file):
 def get_run_test(file):
     r"""
     Get tests from a run_test.sh file
-    >>> get_run_test(' #!/bin/bash\\npslScore 2> /dev/null || [[ "$?" == 255 ]]')
+    >>> get_run_test(' #!/bin/bash\npslScore 2> /dev/null || [[ "$?" == 255 ]]')
     {'commands': [' #!/bin/bash && pslScore 2> /dev/null || [[ "$?" == 255 ]]']}
     """
     package_tests = {}

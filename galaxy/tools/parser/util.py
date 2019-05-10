@@ -1,5 +1,11 @@
+from galaxy.util.odict import odict
+from .error_level import StdioErrorLevel
 from .interface import ToolStdioExitCode
 from .interface import ToolStdioRegex
+
+
+def is_dict(item):
+    return isinstance(item, dict) or isinstance(item, odict)
 
 
 def error_on_exit_code(out_of_memory_exit_code=None):
@@ -58,10 +64,8 @@ def _error_regex(match):
 
 
 def _set_oom(obj):
-    from galaxy.jobs.error_level import StdioErrorLevel
     obj.error_level = StdioErrorLevel.FATAL_OOM
 
 
 def _set_fatal(obj):
-    from galaxy.jobs.error_level import StdioErrorLevel
     obj.error_level = StdioErrorLevel.FATAL

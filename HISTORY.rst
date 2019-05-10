@@ -6,10 +6,118 @@ History
 .. to_doc
 
 ---------------------
-18.5.6.dev0
+19.5.3.dev0
 ---------------------
 
     
+
+---------------------
+19.5.2 (2019-04-28)
+---------------------
+
+* Update to latest Miniconda version.
+
+---------------------
+19.5.1 (2019-03-03)
+---------------------
+
+* Fix galaxy.tools.verify API method interface change breaking Planemo compatibility.
+
+---------------------
+19.5.0 (2019-03-01)
+---------------------
+
+* Synchronize with the development tip of Galaxy.
+* Fix Travis CI configuration (thanks to @nsoranzo).
+
+---------------------
+18.9.2 (2019-01-02)
+---------------------
+
+* Implement option for uploading local test data.
+* Bring in the latest Galaxy changes, which provide Python 3.7 support.
+
+---------------------
+18.9.1 (2018-09-15)
+---------------------
+
+* More work improving channel handling for mulled containers.
+
+---------------------
+18.9.0 (2018-09-14)
+---------------------
+
+* Update Conda channel order (thanks to @bgruening).
+* Bring in the latest Galaxy changes and add Galaxy XSD to the project.
+* Various cwltool fixes (thanks to @nsoranzo).
+
+---------------------
+18.5.15 (2018-09-12)
+---------------------
+
+* More tweaks to CWL tool loading to support newer versions of cwltool.
+
+---------------------
+18.5.14 (2018-09-12)
+---------------------
+
+* Improved tool linting and reporting thanks to @natefoo and @nsoranzo.
+* Add support for newer cwltool thanks to @nsoranzo.
+* Improved mulled building thanks to @pcm32.
+
+---------------------
+18.5.13 (2018-05-23)
+---------------------
+
+* Small updates to test parsing to support Galaxy workflow testing.
+
+---------------------
+18.5.12 (2018-05-22)
+---------------------
+
+* Update test data processing to allow URIs in Galaxy workflow tests.
+
+---------------------
+18.5.11 (2018-05-16)
+---------------------
+
+* Parse CWL SoftwareRequirements to Galaxy requirements (required to fix various Planemo functionality
+  for CWL tools).
+
+---------------------
+18.5.10 (2018-05-10)
+---------------------
+
+* Docker logging API fix for Planemo.
+
+---------------------
+18.5.9 (2018-05-07)
+---------------------
+
+* Update CWL linting to target CWL 1.0.
+
+---------------------
+18.5.8 (2018-05-06)
+---------------------
+
+* Better error handling for Conda searching (thanks to @bgruening).
+* Update against the latest Galaxy codebase.
+* Add Galaxy tool linting to ensure versions are PEP 440 compliant (thanks to @davebx).
+
+---------------------
+18.5.7 (2018-03-12)
+---------------------
+
+* More tool testing client fixes, this time for ephemeris.
+
+---------------------
+18.5.6 (2018-03-12)
+---------------------
+
+* Bring in the latest Galaxy dev branch - includes code cleanup and many Python 3 fixes from
+  @nsoranzo as well as client code for executing tool tests against external Galaxy instances.
+* Extend tool testing client from Galaxy's dev branch with even more data collection for compatiblity
+  with Planemo.
 
 ---------------------
 18.5.5 (2018-03-06)

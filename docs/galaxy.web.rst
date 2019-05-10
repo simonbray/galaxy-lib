@@ -1,12 +1,5 @@
-galaxy\.web package
-===================
-
-Subpackages
------------
-
-.. toctree::
-
-    galaxy.web.stack
+galaxy.web package
+==================
 
 Module contents
 ---------------

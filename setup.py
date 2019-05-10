@@ -32,6 +32,7 @@ TEST_DIR = 'tests'
 PROJECT_DESCRIPTION = 'Subset of Galaxy (http://galaxyproject.org/) core code base designed to be used a library.'
 PACKAGES = [
     'galaxy',
+    'galaxy.containers',
     'galaxy.jobs',  # Incomplete
     'galaxy.exceptions',
     'galaxy.jobs.metrics',
@@ -129,6 +130,8 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     test_suite=TEST_DIR,
     tests_require=test_requirements

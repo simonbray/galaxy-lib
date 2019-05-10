@@ -21,7 +21,7 @@ before_install:
   - cd $GOPATH/src/github.com/sylabs
   - git clone https://github.com/sylabs/singularity.git
   - cd singularity
-  - go get -u -v github.com/golang/dep/cmd/dep
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
   - cd $GOPATH/src/github.com/sylabs/singularity
   - ./mconfig
   - make -C builddir

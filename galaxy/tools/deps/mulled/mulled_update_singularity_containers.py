@@ -26,9 +26,7 @@ def docker_to_singularity(container, installation, filepath, no_sudo=False):
     """
     Convert docker to singularity container
     >>> from glob import glob
-    >>> from conda.cli.python_api import run_command
     >>> import os, shutil
-    >>> raw_out, err, exit_code = run_command('install', '-c', 'conda-forge/label/gcc7', 'singularity')
     >>> os.mkdir('/tmp/singtest')
     >>> glob('/tmp/singtest/abundancebin:1.0.1--0')
     []
@@ -36,7 +34,6 @@ def docker_to_singularity(container, installation, filepath, no_sudo=False):
     >>> glob('/tmp/singtest/abundancebin:1.0.1--0')
     ['/tmp/singtest/abundancebin:1.0.1--0']
     >>> shutil.rmtree('/tmp/singtest')
-    >>> raw_out, err, exit_code = run_command('remove', 'singularity')
     """
 
     try:
@@ -55,8 +52,6 @@ def test_singularity_container(tests, installation, filepath):
     """
     Run tests, record if they pass or fail
     >>> import os, shutil
-    >>> from conda.cli.python_api import run_command
-    >>> raw_out, err, exit_code = run_command('install', '-c', 'conda-forge/label/gcc7', 'singularity')
     >>> os.mkdir('/tmp/singtest')
     >>> for n in ['pybigwig:0.1.11--py36_0', 'samtools:1.0--1', 'yasm:1.3.0--0']:
     ...     docker_to_singularity(n, 'singularity', '/tmp/singtest', no_sudo=True)
@@ -68,7 +63,6 @@ def test_singularity_container(tests, installation, filepath):
     >>> 'yasm:1.3.0--0' in results['notest']
     True
     >>> shutil.rmtree('/tmp/singtest')
-    >>> raw_out, err, exit_code = run_command('remove', 'singularity')
     """
     test_results = {'passed': [], 'failed': [], 'notest': []}
 
